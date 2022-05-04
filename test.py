@@ -25,8 +25,8 @@ def main(K_obs, K_int, path):
     results.to_csv(path_ + f"results.csv")
 
 if __name__ == "__main__":
-    Ks = [10000000]
-    Kints = [1000000]
+    Ks = [1000000]
+    Kints = [10000,100000]
     path = "../experiments/"
     for K_obs in Ks:
         for K_int in Kints:

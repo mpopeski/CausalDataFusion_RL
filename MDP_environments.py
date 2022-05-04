@@ -65,7 +65,7 @@ class TabularMDP:
         if state and action: 
             reward = 0
             if state in self.reward_states:
-                reward = 1
+                reward = 0.1
                 
             u = np.random.binomial(1, self.u_prob[state], 1)
             state_ = np.array(state)

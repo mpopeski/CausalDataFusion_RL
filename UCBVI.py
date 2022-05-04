@@ -30,30 +30,34 @@ class UCBVI:
         self.data = pd.DataFrame(index = range(K), columns = range(self.H), dtype = object)
         
         self.Q = [pd.DataFrame(self.H, index = self.states, columns = self.actions, dtype = float) for _ in range(self.H)]
+
         self.V = pd.DataFrame(0, index = self.states, columns = range(self.H+1), dtype = float)
+
         
         self.cumreward = pd.Series(index = range(K), dtype = float)
 
 
     def UCB_Q(self):
+        P_SAS = self.SAS_count.divide(self.SA_count["count"], axis = 0)
+        R = self.SA_reward["total"].divide(self.SA_count["count"])
         for h in range(self.H-1,-1,-1):
             
             Vs = self.V.loc[:,h+1]
-            P_SAS = self.SAS_count.divide(self.SA_count["count"], axis = 0)
-            R = self.SA_reward["total"].divide(self.SA_count["count"])
             Q = (R + P_SAS.multiply(Vs).sum(axis = 1) + self.bonus(self.SA_count)["count"]).unstack(level = 1).fillna(self.H)
             mask = Q < self.Q[h]
             self.Q[h][mask] = Q[mask]
             self.Q[h].clip(lower = None, upper = self.H, inplace = True)
+            
             """
             for sa in self.SA:
                 if self.SA_count["count"].loc[sa]:
                     self.Q[h].loc[sa[0], sa[1]] = self.update_q(sa[0], sa[1], h)
                 else:
                     self.Q[h].loc[sa[0], sa[1]] = float(self.H)
-            """
+            
             
             self.V.loc[:,h] = self.Q[h].max(axis=1)
+            """
                 
                     
     def Bellman_Q(self, state, action, h):
