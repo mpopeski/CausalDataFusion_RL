@@ -55,9 +55,9 @@ class UCBVI:
                 else:
                     self.Q[h].loc[sa[0], sa[1]] = float(self.H)
             
-            
-            self.V.loc[:,h] = self.Q[h].max(axis=1)
             """
+            self.V.loc[:,h] = self.Q[h].max(axis=1)
+            
                 
                     
     def Bellman_Q(self, state, action, h):
