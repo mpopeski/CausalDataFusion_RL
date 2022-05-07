@@ -20,7 +20,7 @@ def main(K_obs, K_int, path):
         model.learn()
         results.append(model.cumreward.cumsum())
         model.V.to_csv(path_ + f"V_{integ}.csv")
-        print(model.save_model(path_))
+        print(model.save_model(path_ + f"{integ}/"))
     
     results = pd.DataFrame(results, index = integration)
     results.to_csv(path_ + f"results.csv")
