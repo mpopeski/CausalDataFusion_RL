@@ -4,6 +4,7 @@
 import numpy as np
 import pandas as pd
 from ast import literal_eval
+import os
 
 class UCBVI:
     
@@ -132,8 +133,10 @@ class UCBVI:
                 
     
     def save_model(self, path):
+        path_ = path +"Q/"
+        os.makedirs(path_, exist_ok=True)
         for h in range(len(self.Q)):
-            self.Q[h].to_csv(path + f"Q/Q_{h}.csv")
+            self.Q[h].to_csv(path + f"Q_{h}.csv")
         self.SA_count.to_csv(path + "SA_counts.csv")
         self.SAs_count.to_csv(path + "SAS_counts.csv")
         self.SA_reward.to_csv(path + "SA_reward.csv")
