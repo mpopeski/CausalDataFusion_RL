@@ -130,5 +130,14 @@ class UCBVI:
             else:
                 raise ValueError("Not a valid initialization method. Choose from: ignore, naive, controlled")
                 
+    
+    def save_model(self, path):
+        for h in range(len(self.Q)):
+            self.Q[h].to_csv(path + f"Q/Q_{h}.csv")
+        self.SA_count.to_csv(path + "SA_counts.csv")
+        self.SAs_count.to_csv(path + "SAS_counts.csv")
+        self.SA_reward.to_csv(path + "SA_reward.csv")
+        return self.env.reward_states
+                
                 
     
