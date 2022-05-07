@@ -138,7 +138,7 @@ class UCBVI:
         for h in range(len(self.Q)):
             self.Q[h].to_csv(path + f"Q_{h}.csv")
         self.SA_count.to_csv(path + "SA_counts.csv")
-        self.SAs_count.to_csv(path + "SAS_counts.csv")
+        self.SAS_count.to_csv(path + "SAS_counts.csv")
         self.SA_reward.to_csv(path + "SA_reward.csv")
         return self.env.reward_states
                 
