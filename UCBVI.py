@@ -133,8 +133,7 @@ class UCBVI:
                 
     
     def save_model(self, path):
-        path_ = path +"Q/"
-        os.makedirs(path_, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
         for h in range(len(self.Q)):
             self.Q[h].to_csv(path + f"Q_{h}.csv")
         self.SA_count.to_csv(path + "SA_counts.csv")

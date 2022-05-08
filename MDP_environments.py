@@ -120,7 +120,7 @@ class TabularMDP:
             self.SA_reward.loc[str(s),str(a)] += r
             episode.append((s,a,r,s_))
             s = s_
-        return episode, self.SA_count, self.SA_reward, self.SA_reward
+        return episode, self.SA_count, self.SAS_count, self.SA_reward
     
     def default_policy(self, s, actions, h, u=0):
         if u:
