@@ -58,8 +58,7 @@ class UCBVI:
             
             """
             self.V.loc[:,h] = self.Q[h].max(axis=1)
-            
-                
+                        
                     
     def Bellman_Q(self, state, action, h):
         N_sa = self.SA_count["count"].loc[state,action]
