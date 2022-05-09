@@ -68,8 +68,7 @@ class Vmax:
     
     def policy(self, state):
         Qs = self.Q["value"].loc[str(state), :]
-        action = Qs.idxmax()[-1]
-        print(action)
+        action = Qs.idxmax()
         return literal_eval(action)
         
     def learn(self):
