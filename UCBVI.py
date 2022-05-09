@@ -49,26 +49,7 @@ class UCBVI:
             self.Q[h][mask] = Q[mask]
             self.Q[h].clip(lower = None, upper = self.H, inplace = True)
             
-            """
-            for sa in self.SA:
-                if self.SA_count["count"].loc[sa]:
-                    self.Q[h].loc[sa[0], sa[1]] = self.update_q(sa[0], sa[1], h)
-                else:
-                    self.Q[h].loc[sa[0], sa[1]] = float(self.H)
-            
-            """
             self.V.loc[:,h] = self.Q[h].max(axis=1)
-                        
-                    
-    def Bellman_Q(self, state, action, h):
-        N_sa = self.SA_count["count"].loc[state,action]
-        P_SAS = self.SAS_count.loc[state,action].divide(N_sa)
-        Vs = self.V.loc[:, h+1]
-        R_sa = self.SA_reward["total"].loc[state, action] / N_sa
-        return R_sa + (P_SAS.multiply(Vs)).sum() + self.bonus(N_sa)
-        
-    def update_q(self, state, action, h):
-        return min(self.Q[h].loc[state, action], self.H, self.Bellman_Q(state, action, h))
     
     def bonus(self, N):
         return 7*self.H*self.L*np.sqrt((1/N))
@@ -119,14 +100,17 @@ class UCBVI:
                 self.SA_reward += self.env.counts["SA_reward"]
             elif how == "controlled":
                 print("Integrating the observational data with controlled confounding")
-                P_us = (self.env.counts["SU"].divide(self.env.counts["S"]["count"],axis=0)).fillna(0)
-                P_suas1 = self.env.counts["SUAS"][0].divide(self.env.counts["SUA"][0]["count"], axis = 0).fillna(0)
-                P_suas2 = self.env.counts["SUAS"][1].divide(self.env.counts["SUA"][1]["count"], axis = 0).fillna(0)
+                P_us = (self.env.counts["SU"].divide(self.env.counts["S"]["count"].clip(lower = 1, upper = None), axis=0))
+                P_suas1 = self.env.counts["SUAS"][0].divide(self.env.counts["SUA"][0]["count"].clip(lower = 1, upper = None), axis = 0)
+                P_suas2 = self.env.counts["SUAS"][1].divide(self.env.counts["SUA"][1]["count"].clip(lower = 1, upper = None), axis = 0)
                 P_sas = P_suas1.multiply(P_us[0], axis = 0, level = 0) + P_suas2.multiply(P_us[1], axis = 0, level = 0)
-                SAS_count = P_sas.multiply(self.env.counts["SA"]["count"], axis = 0, level = 0)
-                self.SA_count += self.env.counts["SA"]
-                self.SA_reward += self.env.counts["SA_reward"]
+                SA_count = self.env.counts["SA"]
+                SAS_count = P_sas.multiply(SA_count["count"], axis = 0, level = 0)
+                SA_reward =  self.env.counts["SA_reward"]
+                self.SA_count["count"] += SAS_count.sum(axis = 1)
                 self.SAS_count += SAS_count
+                self.SA_reward["total"] += SA_reward["total"].divide(SA_count["count"].clip(lower = 1, upper = None), axis = 0) * \
+                    self.SA_count["count"]
             else:
                 raise ValueError("Not a valid initialization method. Choose from: ignore, naive, controlled")
                 
@@ -138,7 +122,16 @@ class UCBVI:
         self.SA_count.to_csv(path + "SA_counts.csv")
         self.SAS_count.to_csv(path + "SAS_counts.csv")
         self.SA_reward.to_csv(path + "SA_reward.csv")
-        return self.env.reward_states
-                
+        return self.env.reward_states         
+                     
+    def Bellman_Q(self, state, action, h):
+        N_sa = self.SA_count["count"].loc[state,action]
+        P_SAS = self.SAS_count.loc[state,action].divide(N_sa)
+        Vs = self.V.loc[:, h+1]
+        R_sa = self.SA_reward["total"].loc[state, action] / N_sa
+        return R_sa + (P_SAS.multiply(Vs)).sum() + self.bonus(N_sa)
+        
+    def update_q(self, state, action, h):
+        return min(self.Q[h].loc[state, action], self.H, self.Bellman_Q(state, action, h))
                 
     

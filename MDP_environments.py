@@ -44,7 +44,7 @@ class TabularMDP:
         start_prob = np.random.choice(default_prob, replace = True, size = len(self.start_states))
         self.start_prob = np.exp(start_prob) / np.exp(start_prob).sum() 
         
-        self.u_prob = {state : (0.9-0.1)*np.random.rand() + 0.1 for state in self.states}
+        self.u_prob = {state : (0.8-0.2)*np.random.rand() + 0.2 for state in self.states}
         
         # default policy (obervational) parameters
         default_prob = np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)) for _ in range(len(self.states))])
@@ -69,7 +69,7 @@ class TabularMDP:
                 
             u = np.random.binomial(1, self.u_prob[state], 1)
             state_ = np.array(state)
-            if np.random.rand() < 0.5:
+            if np.random.rand() < 0.75:
                 if np.random.rand() < 0.5:
                     state_[0] += 2*u-1
                 else:
@@ -86,10 +86,10 @@ class TabularMDP:
         if state and action: 
             reward = 0
             if state in self.reward_states:
-                reward = 1
+                reward = 0.1
                 
             state_ = np.array(state)
-            if np.random.rand() < 0.5:
+            if np.random.rand() < 0.75:
                 if np.random.rand() < 0.5:
                     state_[0] += 2*u-1
                 else:

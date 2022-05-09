@@ -7,7 +7,7 @@ from MDP_environments import TabularMDP
 import os
 
 def main(K_obs, K_int, path):
-    path_ = path + f"{K_obs}_{K_int}/"
+    path_ = path + f"UCBVI/{K_obs}_{K_int}/"
     os.makedirs(path_, exist_ok=True)
     env = TabularMDP(2, 3, 2, [-1,0,1], 5)
     env.observational_data(K_obs)
@@ -26,8 +26,8 @@ def main(K_obs, K_int, path):
     results.to_csv(path_ + f"results.csv")
 
 if __name__ == "__main__":
-    Ks = [2000000]
-    Kints = [200000]
+    Ks = [200] #[2000000]
+    Kints = [20] #[200000]
     path = "../experiments/"
     for K_obs in Ks:
         for K_int in Kints:
