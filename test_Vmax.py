@@ -30,8 +30,8 @@ def main(K_obs, K_int, m, path):
         results.to_csv(path_ + f"results{rep}.csv")
 
 if __name__ == "__main__":
-    configs = [(5000,200,500), (10000, 500, 1000) ,(10000, 1000, 1000), (15000, 500, 1000),
-               (5000,5000,500), (5000, 2500, 500), (5000,5000,1000)]
+    configs = [(10000, 10000, 1000), (12500, 7500, 1000), (15000, 5000, 1000),
+               (7500, 12500, 1000), (5000, 15000, 1000)]
     path = "../experiments/"
     for config in configs:
         main(config[0], config[1], config[2], path)
