@@ -125,10 +125,11 @@ class TabularMDP:
             dist[0] = defaultdict(default_val)
             dist[1] = defaultdict(default_val)
             for action in actions:
-                conf_rewards = total_reward*np.random.rand(2)
-                conf_prob = (0.9-0.1)*np.random.rand(2) + 0.1
+                conf_rewards = (total_reward / 2) * np.random.rand(2)
+                conf_prob = (conf_rewards.max() + 0.1)*np.random.rand(2)
                 dist[0][action] = np.array([conf_rewards[0], conf_prob[0]])
                 dist[1][action] = np.array([conf_rewards[1], conf_prob[1]])
+            
             reward_dist[state] = dist
         
         return reward_dist
