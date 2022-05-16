@@ -14,7 +14,7 @@ def main(K_obs, K_int, m, path):
     integration = ["ignore", "naive", "controlled"]
     gamma = 0.9
     eta = 0.0001
-    Rmax = 1
+    Rmax = 10
     reps = 10
     for rep in range(reps):
         results = []
@@ -30,7 +30,7 @@ def main(K_obs, K_int, m, path):
         results.to_csv(path_ + f"results{rep}.csv")
 
 if __name__ == "__main__":
-    configs = [(20000, 10000, 1000), (30000, 10000, 1000)]
+    configs = [(50000, 20000, 1000)]
     path = "../experiments12_newReward/"
     for config in configs:
         main(config[0], config[1], config[2], path)

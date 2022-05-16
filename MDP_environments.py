@@ -114,7 +114,7 @@ class TabularMDP:
     
     def get_reward_distribution(self):
         
-        total_reward = 1
+        total_reward = 10
         reward_dist = defaultdict(dict)
         
         def default_val():
@@ -126,7 +126,7 @@ class TabularMDP:
             dist[1] = defaultdict(default_val)
             for action in actions:
                 conf_rewards = (total_reward / 2) * np.random.rand(2)
-                conf_prob = (conf_rewards.max() + 0.1)*np.random.rand(2)
+                conf_prob = (conf_rewards / total_reward + 0.1)*np.random.rand(2)
                 dist[0][action] = np.array([conf_rewards[0], conf_prob[0]])
                 dist[1][action] = np.array([conf_rewards[1], conf_prob[1]])
             
@@ -136,7 +136,7 @@ class TabularMDP:
     
     def get_default_observational_policy(self, default_prob):
         
-        total_reward = 1
+        total_reward = 10
         initial_logits_u1 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions))\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
         initial_logits_u0 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions))\
@@ -169,7 +169,7 @@ class TabularMDP:
         return pd.DataFrame(prob_u1, index = pd.Series(self.states).apply(str)), pd.DataFrame(prob_u0, index = pd.Series(self.states).apply(str))
         
     def get_reward(self, state, action, conf):
-        total_reward = 1
+        total_reward = 10
         if self.reward_dist[state]:
             if self.reward_dist[state][conf][action].any():
                 reward_par = self.reward_dist[state][conf][action]
