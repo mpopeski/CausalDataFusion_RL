@@ -31,6 +31,6 @@ def main(K_obs, K_int, m, path):
 
 if __name__ == "__main__":
     configs = [(50000, 20000, 1000)]
-    path = "../experiments12_newReward/"
+    path = "../experiments_v5/"
     for config in configs:
         main(config[0], config[1], config[2], path)
