@@ -159,8 +159,8 @@ class TabularMDP:
             idx_action_u0 = self.actions.index(BWC_u0)
             idx_action_u1 = self.actions.index(BWC_u1)
             
-            initial_logits_u1.loc[str(state), idx_action_u1] = max_logit_u1 + np.log(2)
-            initial_logits_u0.loc[str(state), idx_action_u0] = max_logit_u0 + np.log(2)
+            initial_logits_u1.loc[str(state), idx_action_u1] = max_logit_u1 + np.log(4)
+            initial_logits_u0.loc[str(state), idx_action_u0] = max_logit_u0 + np.log(4)
 
         
         prob_u1 = (np.exp(initial_logits_u1).T / np.exp(initial_logits_u1).sum(axis = 1)).T
