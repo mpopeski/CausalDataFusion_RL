@@ -238,7 +238,6 @@ class TabularMDP:
                 prob1.append(self.reward_dist[state][1][action][1])
         
         index = pd.MultiIndex.from_tuples(index, names = ["s","a"])
-        print(len(index))
         reward_dist = pd.DataFrame(np.array([reward0, prob0, reward1, prob1]).T, index = index, columns = ["reward0", "prob0", "reward1", "prob1"])
         reward_dist.to_csv(path + "reward_dist.csv")
         pd.DataFrame(self.u_prob.values(), index = pd.Series(self.u_prob.keys()).apply(str), columns = ["prob of 1"]).to_csv(path + "confounder.csv")
