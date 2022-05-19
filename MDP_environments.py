@@ -5,19 +5,9 @@ import numpy as np
 import pandas as pd
 from itertools import product
 from collections import defaultdict
+import os
 
-"""
-3 environments:
-    1. Causal Gridworld
-    
-    2. fully factored environment groups of state variables at time t+1 are only affected by
-    the same group at time t, and actions only affect specific groups. i.e. no crossover
-    
-    3. sparse environment where state variables at time t+1 depend on random 
-    amount of state variables at time t, (same for actions), there can be crossover
-    i.e. for example one variable in time t can have influence on 2 or more variable
-    groups in time t+1
-"""
+
 
 class TabularMDP:
     
@@ -231,61 +221,34 @@ class TabularMDP:
     
     def observational_data(self, K):
         self.data, self.counts = self.get_obs_data(K) 
-                
-
-class causalBlock:
-    
-    def __init__(self, Sn, Sm, An, Am):
-        pass
-    
-    def transition(self, state, action):
-        pass
-
-class sparseMDP:
-    
-    def __init__(self):
-        pass
-    
-    def get_states(self, args):
-        """
-        get the state space based on arguments such as:
-            1. the number of variables Sn
-            2. the number of values each variable can take Sm
-        """
-        pass
-    
-    def get_actions(self, args):
-        """
-        get the action space based argumnes:
-            1. the number of action variables (subactions) An
-            2. the number of values each action can take Am
-        """
-        pass
-    
-    def get_causal_structure(self, args):
-        """
-        get the rules of how the transition probability will factorize
-        should return some form of dictonary or dataframe that can later can also be used
-        in the learning algorithms
-        """
-        pass
-    
-    def transition(self, args):
-        """
-        define a transition probability based on the causal structure
-        """
-        pass
-    
-    def reward(self, state, action):
-        """
-        define a reward function, maybe in this case as a sum of the individual factorizations
-        """
-        pass
-    
-    def play(self, state, action):
-        """
-        takes input current state and action
-        returns next state, reward (or rewards depending on assumption)
-        """
-        pass
-    
+        
+    def save_env(self, path):
+        os.makedirs(path, exist_ok=True)
+        index = []
+        reward0 = []
+        prob0 = []
+        reward1 = []
+        prob1 = []
+        for state, actions in self.reward_actions.items():
+            for action in actions:
+                index.append((str(state), str(action)))
+                reward0.append(self.reward_dist[state][0][action][0])
+                prob0.append(self.reward_dist[state][0][action][1])
+                reward1.append(self.reward_dist[state][1][action][0])
+                prob1.append(self.reward_dist[state][1][action][1])
+        
+        index = pd.MultiIndex.from_tuples(index, names = ["s","a"])
+        print(len(index))
+        reward_dist = pd.DataFrame(np.array([reward0, prob0, reward1, prob1]).T, index = index, columns = ["reward0", "prob0", "reward1", "prob1"])
+        reward_dist.to_csv(path + "reward_dist.csv")
+        pd.DataFrame(self.u_prob.values(), index = pd.Series(self.u_prob.keys()).apply(str), columns = ["prob of 1"]).to_csv(path + "confounder.csv")
+        prob_u0 = self.prob_u0.copy()
+        prob_u1 = self.prob_u1.copy()
+        prob_u0.columns = pd.Series(self.actions).apply(str)
+        prob_u1.columns = pd.Series(self.actions).apply(str)
+        policy_folder = path + "policy/"
+        os.makedirs(policy_folder, exist_ok=True)
+        prob_u0.to_csv(path + "policy/actions_u0.csv")
+        prob_u1.to_csv(path + "policy/actions_u1.csv")
+        pd.DataFrame(self.start_prob, index = pd.Series(self.start_states).apply(str), columns = ["start_prob"]).to_csv(path +"start_prob.csv")
+        
