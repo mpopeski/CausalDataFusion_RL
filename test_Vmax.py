@@ -41,6 +41,7 @@ def main(config):
 if __name__ == "__main__":
     path = "../experiments_v11/"
     configs = [(2500, 2000, 1000, path), (3000, 2000, 1000, path), (3500, 2000, 1000, path)]
-    with Pool(len(configs) + 1) as p:
+    print(os.cpu_count())
+    with Pool(processes=None) as p:
         p.map(main, configs)
 
