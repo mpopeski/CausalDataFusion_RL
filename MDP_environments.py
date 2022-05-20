@@ -144,7 +144,7 @@ class TabularMDP:
             
             # best worst case rewards in the reward states
             u0_cont = {key: min(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][0].items()}
-            u1_cont = {key: min(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][1].items()}
+            u1_cont = {key: max(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][1].items()}
             
             BWC_u0 = max(u0_cont, key = u0_cont.get)
             BWC_u1 = max(u1_cont, key = u1_cont.get)
@@ -174,7 +174,7 @@ class TabularMDP:
             
             # best worst case rewards in the reward states
             u0_cont = {key: min(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][0].items()}
-            u1_cont = {key: min(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][1].items()}
+            u1_cont = {key: max(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][1].items()}
             
             
             BWC_u0 = max(u0_cont, key = u0_cont.get)
