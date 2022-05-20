@@ -11,7 +11,7 @@ import os
 
 class TabularMDP:
     
-    def __init__(self, state_dim, state_values, action_dim, action_values, H, n_reward_states = 3, n_reward_actions = 2, default_prob = 6):
+    def __init__(self, state_dim, state_values, action_dim, action_values, H, n_reward_states = 3, n_reward_actions = 2, default_prob = 6, policy = "random"):
         
         if isinstance(action_values, int):
             action_values = [i for i in range(action_values)]
@@ -39,7 +39,10 @@ class TabularMDP:
         self.u_prob = {state : (0.8-0.2)*np.random.rand() + 0.2 for state in self.states}
         
         # default policy (obervational) parameters
-        self.prob_u1, self.prob_u0 = self.get_default_observational_policy(default_prob)
+        if policy == "random":
+            self.prob_u1, self.prob_u0 = self.get_default_observational_policy(default_prob)
+        elif policy == "v2_eng":
+            self.prob_u1, self.prob_u0 = self.get_df_policy_v2(default_prob)
         
         # counters
         SA = pd.MultiIndex.from_product([pd.Series(self.states).apply(str), pd.Series(self.actions).apply(str)], 
@@ -127,9 +130,9 @@ class TabularMDP:
     def get_default_observational_policy(self, default_prob):
         
         total_reward = 1
-        initial_logits_u1 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions))\
+        initial_logits_u1 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
-        initial_logits_u0 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions))\
+        initial_logits_u0 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
             
         for state in self.reward_states:
@@ -158,6 +161,70 @@ class TabularMDP:
         
         return pd.DataFrame(prob_u1, index = pd.Series(self.states).apply(str)), pd.DataFrame(prob_u0, index = pd.Series(self.states).apply(str))
         
+    def get_df_policy_v2(self, default_prob):
+        total_reward = 1
+        prob_u1 = pd.DataFrame(0, index = pd.Series(self.states).apply(str), columns = range(4))
+        prob_u0 = pd.DataFrame(0, index = pd.Series(self.states).apply(str), columns = range(4))
+        n_reward_actions = len(list(self.reward_actions.values())[0])
+        total_actions = len(self.actions)
+        assert len(prob_u1.iloc[0]) == total_actions
+        assert len(prob_u0.iloc[0]) == total_actions
+        
+        for state in self.reward_states:
+            
+            # best worst case rewards in the reward states
+            u0_cont = {key: min(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][0].items()}
+            u1_cont = {key: min(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][1].items()}
+            
+            
+            BWC_u0 = max(u0_cont, key = u0_cont.get)
+            BWC_u1 = max(u1_cont, key = u1_cont.get)
+            
+            reward_actions = list(u0_cont.keys())
+            #reward_actions1 = list(u1_cont.keys())
+
+            
+            prob0 = (0.1/(total_actions - n_reward_actions)) * np.ones(total_actions)
+            prob1 = (0.1/(total_actions - n_reward_actions)) * np.ones(total_actions)
+            for action in reward_actions: #0, reward_actions1):
+                idx_action = self.actions.index(action)
+                if action == BWC_u0:
+                    prob0[idx_action] = 0.6
+                else:
+                    prob0[idx_action] = 0.3/ (n_reward_actions - 1)
+                    
+                if action == BWC_u1:
+                    prob1[idx_action] = 0.75
+                else:
+                    prob1[idx_action] = 0.15/ (n_reward_actions - 1)
+
+                    
+            prob_u0.loc[str(state), :] = prob0
+            prob_u1.loc[str(state), :] = prob1
+        
+        for state in self.start_states:
+            counter = 1000000
+            closest_rw = None
+            for rw_state in self.reward_states:
+                distance = abs(state[0] - rw_state[0]) + abs(state[1] - rw_state[1]) 
+                if distance < counter:
+                    counter = distance
+                    closest_rw = rw_state
+            x_action = (np.sign(closest_rw[0] - state[0]), 0)
+            y_action = (0, np.sign(closest_rw[1] - state[1]))
+            
+            logits = np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)
+            logits0 = logits.copy()
+            logits1 = logits.copy()
+            for i in range(total_actions):
+                if self.actions[i] == x_action or self.actions[i] == y_action:
+                    logits0[i] = logits.max() + np.log(2) 
+                    logits1[i] = logits.max() + np.log(4)
+            prob_u0.loc[str(state), :]= np.exp(logits0) / np.exp(logits0).sum()
+            prob_u1.loc[str(state), :]= np.exp(logits1) / np.exp(logits1).sum()        
+            
+        return prob_u1, prob_u0
+    
     def get_reward(self, state, action, conf):
         total_reward = 1
         if self.reward_dist[state]:
