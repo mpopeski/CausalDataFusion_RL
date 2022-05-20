@@ -24,7 +24,7 @@ def main(config):
     gamma = 0.9
     eta = 0.0001
     Rmax = 1
-    reps = 5
+    reps = 3
     for rep in range(reps):
         results = []
         for integ in integration:
