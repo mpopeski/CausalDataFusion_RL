@@ -174,7 +174,7 @@ class TabularMDP:
             
             # best worst case rewards in the reward states
             u0_cont = {key: min(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][0].items()}
-            u1_cont = {key: max(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][1].items()}
+            u1_cont = {key: min(value[0], total_reward - value[0]) for key, value in self.reward_dist[state][1].items()}
             
             
             BWC_u0 = max(u0_cont, key = u0_cont.get)
@@ -184,14 +184,14 @@ class TabularMDP:
             #reward_actions1 = list(u1_cont.keys())
 
             
-            prob0 = (0.1/(total_actions - n_reward_actions)) * np.ones(total_actions)
+            prob0 = (0.7/(total_actions - n_reward_actions)) * np.ones(total_actions)
             prob1 = (0.1/(total_actions - n_reward_actions)) * np.ones(total_actions)
             for action in reward_actions: #0, reward_actions1):
                 idx_action = self.actions.index(action)
                 if action == BWC_u0:
-                    prob0[idx_action] = 0.6
+                    prob0[idx_action] = 0.1
                 else:
-                    prob0[idx_action] = 0.3/ (n_reward_actions - 1)
+                    prob0[idx_action] = 0.2/ (n_reward_actions - 1)
                     
                 if action == BWC_u1:
                     prob1[idx_action] = 0.75

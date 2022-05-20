@@ -14,7 +14,7 @@ def main(config):
     path = config[3]
     path_ = path + f"Vmax/{K_obs}_{K_int}_{m}/"
     os.makedirs(path_, exist_ok=True)
-    env = TabularMDP(2, 5, 2, [-1,0,1], 10, n_reward_states = 12)
+    env = TabularMDP(2, 5, 2, [-1,0,1], 10, n_reward_states = 12, policy = "v2_eng")
     
     path_environment = path_ + "environment/"
     env.save_env(path_environment)
