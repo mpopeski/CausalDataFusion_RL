@@ -39,7 +39,7 @@ def main(config):
         results.to_csv(path_ + f"results{rep}.csv")
 
 if __name__ == "__main__":
-    path = "../experiments_v17/"
+    path = "../experiments_v18/"
     configs = [(25000, 20000, 1000, path), (29000, 20000, 1000, path), (33000, 20000, 1000, path),
                (26000, 20000, 1000, path), (30000, 20000, 1000, path), (34000, 20000, 1000, path),
                (27000, 20000, 1000, path), (31000, 20000, 1000, path), (35000, 20000, 1000, path),
