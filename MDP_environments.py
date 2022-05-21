@@ -11,7 +11,9 @@ import os
 
 class TabularMDP:
     
-    def __init__(self, state_dim, state_values, action_dim, action_values, H, n_reward_states = 3, n_reward_actions = 2, default_prob = 6, policy = "random"):
+    def __init__(self, state_dim, state_values, action_dim, action_values, H,\
+                 n_reward_states = 3, n_reward_actions = 2, default_prob = 6, policy = "random",\
+                 simpson = False):
         
         if isinstance(action_values, int):
             action_values = [i for i in range(action_values)]
@@ -30,7 +32,10 @@ class TabularMDP:
         self.reward_states = [self.states[i] for i in np.random.choice(len(self.states), replace=False, size = n_reward_states)]
         self.reward_actions = {self.reward_states[j]: [self.actions[i] for i in np.random.choice(len(self.actions),\
                             replace=False, size = n_reward_actions)] for j in range(len(self.reward_states))}
-        self.reward_dist = self.get_reward_distribution()
+        if simpson:
+            self.reward_dist = self.get_reward_distribution_simpson()
+        else:
+            self.reward_dist = self.get_reward_distribution()
         
         self.start_states = [state for state in self.states if state not in self.reward_states] #if sum(state)<=(self.max_state-2)]
         start_prob = np.random.choice(default_prob, replace = True, size = len(self.start_states))
@@ -43,6 +48,8 @@ class TabularMDP:
             self.prob_u1, self.prob_u0 = self.get_default_observational_policy(default_prob)
         elif policy == "v2_eng":
             self.prob_u1, self.prob_u0 = self.get_df_policy_v2(default_prob)
+        elif policy == "v3_eng":
+            self.prob_u1, self.prob_u0 = self.get_df_policy_v3(default_prob)
         
         # counters
         SA = pd.MultiIndex.from_product([pd.Series(self.states).apply(str), pd.Series(self.actions).apply(str)], 
@@ -127,6 +134,31 @@ class TabularMDP:
         
         return reward_dist
     
+    def get_reward_distribution_simpson(self):
+        
+        reward_dist = defaultdict(dict)
+        
+        def default_val():
+            return np.array([])
+        
+        for state,  actions in self.reward_actions.items():
+            dist = {}
+            dist[0] = defaultdict(default_val)
+            dist[1] = defaultdict(default_val)
+            rewards_lower = 0.5*np.random.rand(len(actions))
+            rewards_lower.sort()
+            rewards_upper = 0.1*np.random.rand(len(actions)) + 0.8
+            rewards_upper.sort()
+            actions_ = pd.Series(actions).sample(frac=1.)
+            
+            for i in range(len(actions_)):
+                dist[0][actions_.iloc[i]] = np.array([rewards_lower[i], 1])
+                dist[1][actions_.iloc[i]] = np.array([rewards_upper[i], 1])
+                
+            reward_dist[state] = dist
+        
+        return reward_dist
+        
     def get_default_observational_policy(self, default_prob):
         
         total_reward = 1
@@ -225,12 +257,46 @@ class TabularMDP:
             
         return prob_u1, prob_u0
     
+    def get_df_policy_v3(self, default_prob):
+        
+        initial_logits_u1 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)\
+                                                   for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
+        initial_logits_u0 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)\
+                                                   for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
+            
+        for state in self.reward_states:
+            
+            assert len(initial_logits_u1.loc[str(state)]) == len(self.actions)
+            
+            max_logit_u1 = initial_logits_u1.loc[str(state)].max()
+            max_logit_u0 = initial_logits_u0.loc[str(state)].max()
+            
+            # best case rewards in the lower reward confounder
+            u0_cont = {key: value[0] for key, value in self.reward_dist[state][0].items()}
+            # worst case rewards in the uppder confounder
+            u1_cont = {key: value[0] for key, value in self.reward_dist[state][1].items()}
+            
+            BWC_u0 = max(u0_cont, key = u0_cont.get)
+            BWC_u1 = min(u1_cont, key = u1_cont.get)
+
+            idx_action_u0 = self.actions.index(BWC_u0)
+            idx_action_u1 = self.actions.index(BWC_u1)
+            
+            initial_logits_u1.loc[str(state), idx_action_u1] = max_logit_u1 + np.log(4)
+            initial_logits_u0.loc[str(state), idx_action_u0] = max_logit_u0 + np.log(4)
+
+        
+        prob_u1 = (np.exp(initial_logits_u1).T / np.exp(initial_logits_u1).sum(axis = 1)).T
+        prob_u0 = (np.exp(initial_logits_u0).T / np.exp(initial_logits_u0).sum(axis = 1)).T
+        
+        return pd.DataFrame(prob_u1, index = pd.Series(self.states).apply(str)), pd.DataFrame(prob_u0, index = pd.Series(self.states).apply(str))
+    
     def get_reward(self, state, action, conf):
         total_reward = 1
         if self.reward_dist[state]:
             if self.reward_dist[state][conf][action].any():
                 reward_par = self.reward_dist[state][conf][action]
-                rewards = [reward_par[0], total_reward-reward_par[0]]
+                rewards = [total_reward - reward_par[0], reward_par[0]]
                 idx = np.random.binomial(1, reward_par[1], 1)[0]
                 return rewards[idx]
             return 0
