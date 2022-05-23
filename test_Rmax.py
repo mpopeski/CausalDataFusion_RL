@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import pandas as pd
-from Vmax import Vmax
+from Rmax import R_MAX
 from MDP_environments import TabularMDP
 import os
 from multiprocessing import Pool
@@ -12,7 +12,7 @@ def main(config):
     K_int = config[1]
     m = config[2]
     path = config[3]
-    path_ = path + f"Vmax/{K_obs}_{K_int}_{m}/"
+    path_ = path + f"Rmax/{K_obs}_{K_int}_{m}/"
     os.makedirs(path_, exist_ok=True)
     env = TabularMDP(2, 5, 2, [-1,0,1], 80, n_reward_states = 12, policy = "v3_eng", simpson = True)
     
@@ -28,7 +28,7 @@ def main(config):
     for rep in range(reps):
         results = []
         for integ in integration:
-            model = Vmax(env, gamma, m, eta, Rmax, K_int)
+            model = R_MAX(env, gamma, m, eta, Rmax, K_int)
             model.initialize(integ)
             model.learn()
             results.append(model.reward.cumsum())
@@ -39,8 +39,7 @@ def main(config):
 
 if __name__ == "__main__":
     path = "../experiments_v20/"
-    configs = [(1000, 2000, 1000, path), (3000, 2000, 1000, path),\
+    configs =[(1000, 2000, 1000, path), (3000, 2000, 1000, path),\
                (5000, 2000, 1000, path), (10000, 2000, 1000, path)]
     with Pool(processes=None) as p:
         p.map(main, configs)
-

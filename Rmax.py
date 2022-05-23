@@ -7,7 +7,7 @@ from ast import literal_eval
 import os
 
 
-class Vmax:
+class R_MAX:
     
     def __init__(self, env, gamma, m, eta, Rmax, K):
         self.Rmax = Rmax
@@ -30,11 +30,14 @@ class Vmax:
         self.SA_count = pd.DataFrame(0, index = self.SA, columns = ["count"])
         self.SAS_count = pd.DataFrame(0, index = self.SA, columns = self.states)
         self.SA_reward = pd.DataFrame(0, index = self.SA, columns = ["total"])
-        self.R_sa = pd.DataFrame(0, index = self.SA, columns = ["reward"])
+        self.R_sa = pd.DataFrame(self.Rmax, index = self.SA, columns = ["reward"])
+        self.Q = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
+        self.P_sas = pd.DataFrame(0, index = self.SA, columns = self.states)
+        
+        for state in self.states:
+            self.P_sas[state].loc[state, :] = 1
         
         self.data = pd.DataFrame(index = range(K), columns = range(self.H), dtype = object)
-        
-        self.Q = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
         
         self.reward = pd.Series(0, index = range(K*self.H), dtype = float)
         
@@ -42,36 +45,34 @@ class Vmax:
         self.SA_count.loc[state, action] += 1
         self.SAS_count[next_state].loc[state, action] += 1
         self.SA_reward.loc[state, action] += reward
-        self.R_sa["reward"].loc[state, action] = self.SA_reward["total"].loc[state, action] / self.SA_count["count"].loc[state, action]
+        # self.R_sa["reward"].loc[state, action] = self.SA_reward["total"].loc[state, action] / self.SA_count["count"].loc[state, action]
         
         
     def Q_update(self, state, action, next_state, reward, k):
         self.update_counts(state, action, next_state, reward, k)
-        self.VI()
+        if self.SA_count["count"].loc[state, action] >= self.m:
+            self.R_sa["reward"].loc[state, action] = self.SA_reward["total"].loc[state, action] / self.m
+            self.P_sas.loc[state, action] = self.SAS_count.loc[state, action].divide(self.SA_count["count"].loc[state, action], axis = 0)
+            self.VI()
         
     def VI(self):
-        mask = self.SA_count["count"] > 0
-        P_SAS = self.SAS_count.loc[mask].divide(self.SA_count["count"].loc[mask], axis = 0)
         delta = 0
         first = 1
         while first or (delta > self.eta):
-            q = self.Q.copy()["value"].loc[mask]
-            delayed_value = self.gamma * P_SAS.multiply(self.Q.groupby(level = 0).max()["value"]).sum(axis = 1)
-            imediate_reward = self.R_sa["reward"].loc[mask]
+            q = self.Q.copy()["value"]
+            delayed_value = self.gamma * self.P_sas.multiply(self.Q.groupby(level = 0).max()["value"]).sum(axis = 1)
+            imediate_reward = self.R_sa["reward"]
             Q = imediate_reward + delayed_value
-            Q_ = (self.SA_count["count"].loc[mask] / self.m) * Q + \
-                (1 - self.SA_count["count"].loc[mask] / self.m) * self.Vmax
-            self.Q["value"].loc[mask] = Q_
-            delta = (q - Q_).abs().max()
+            self.Q["value"] = Q
+            delta = (q - Q).abs().max()
             first = 0            
     
     def policy(self, state):
         Qs = self.Q["value"].loc[str(state), :]
-        action = Qs.idxmax()
+        action = Qs.sample(frac = 1.).idxmax()
         return literal_eval(action)
         
     def learn(self):
-        self.VI()
         for k in range(self.K):
             state = self.env.start()
             for h in range(self.H):
@@ -97,8 +98,13 @@ class Vmax:
                 self.SAS_count += P_SAS.multiply(self.SA_count["count"], axis = 0, level = 0) 
                 self.SA_reward["total"] += SA_reward["total"].divide(SA_count["count"].clip(lower = 1, upper = None), axis = 0) * \
                     SA_count.clip(lower = 0, upper = self.m)["count"]
-                self.R_sa["reward"] = self.SA_reward["total"] / self.SA_count["count"]
                 
+                mask = self.SA_count["count"] >= self.m
+                self.R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask] / self.m
+                self.P_sas.loc[mask] = self.SAS_count.loc[mask] / self.m
+                if mask.sum() > 0:
+                    self.VI()
+                    
             elif how == "controlled":
                 print("Integrating the observational data with controlled confounding")
                 P_us = (self.env.counts["SU"].divide(self.env.counts["S"]["count"].clip(lower = 1, upper = None), axis=0))
@@ -117,7 +123,12 @@ class Vmax:
                 self.SA_count["count"] += SAS_count.sum(axis = 1)
                 self.SAS_count += SAS_count
                 self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0, level = 0)
-                self.R_sa["reward"] = R_sa
+                
+                mask = self.SA_count["count"] >= self.m
+                self.R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask] / self.m
+                self.P_sas.loc[mask] = self.SAS_count.loc[mask] / self.m
+                if mask.sum() > 0:
+                    self.VI()
                 
             else:
                 raise ValueError("Not a valid initialization method. Choose from: ignore, naive, controlled")
