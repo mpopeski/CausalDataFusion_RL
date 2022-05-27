@@ -25,7 +25,7 @@ class TabularMDP:
         # get the actions and mediator values if needed
         moves = [(-1, 0), (0, -1), (1, 0), (0, 1)]
         if action_values:
-            self.actions = list(range(action_values))
+            self.actions = list(range(1, action_values+1))
             self.mediators = moves
         else:
             self.actions = moves
@@ -188,6 +188,7 @@ class TabularMDP:
     def transition_conf(self, state = None, action = None, u = None):
         if state and action:
             m_id = np.random.multinomial(1, self.act_to_med[action], 1).argmax()
+            #print(m_id)
             m = self.mediators[m_id]
             reward = self.get_reward(state, m, u[0])    
             state_ = np.array(state)
@@ -196,7 +197,9 @@ class TabularMDP:
                     state_[0] += 2*u-1
                 else:
                     state_[1] += 2*u-1
+            #print(m)
             next_state = np.clip(state_ + np.array(m), a_min = self.min_state, a_max = self.max_state)
+            
             next_state = tuple(next_state)
             #will also need to return the mediator later
             return reward, next_state
