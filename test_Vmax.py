@@ -14,10 +14,10 @@ def main(config):
     path = config[3]
     path_ = path + f"Vmax/{K_obs}_{K_int}_{m}/"
     os.makedirs(path_, exist_ok=True)
-    env = TabularMDP(2, 5, 2, [-1,0,1], 80, n_reward_states = 12, policy = "v3_eng", simpson = True)
+    env = TabularMDP(5, 0, 80, n_reward_states = 12, policy = "v3_eng", simpson = True)
     
-    path_environment = path_ + "environment/"
-    env.save_env(path_environment)
+    #path_environment = path_ + "environment/"
+    #env.save_env(path_environment)
     
     env.observational_data(K_obs)
     integration = ["ignore", "naive", "controlled"]
@@ -38,9 +38,9 @@ def main(config):
         results.to_csv(path_ + f"results{rep}.csv")
 
 if __name__ == "__main__":
-    path = "../experiments_v21/"
+    path = "../experiments_v22/"
     configs = [(1000, 2000, 1000, path), (3000, 2000, 1000, path),\
-               (5000, 2000, 1000, path), (10000, 2000, 1000, path)]
+               (5000, 2000, 1000, path)]
     with Pool(processes=None) as p:
         p.map(main, configs)
 

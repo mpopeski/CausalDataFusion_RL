@@ -15,10 +15,10 @@ def main(config):
     path = config[3]
     path_ = path + f"Both/{K_obs}_{K_int}_{m}/"
     os.makedirs(path_, exist_ok=True)
-    env = TabularMDP(2, 5, 2, [-1,0,1], 80, n_reward_states = 12, policy = "v3_eng", simpson = True)
+    env = TabularMDP(5, 8, 80, n_reward_states = 12, default_prob = 10, policy = "v3_eng", simpson = True)
     
-    path_environment = path_ + "environment/"
-    env.save_env(path_environment)
+    #path_environment = path_ + "environment/"
+    #env.save_env(path_environment)
     
     env.observational_data(K_obs)
     integration = ["ignore", "naive", "controlled"]
