@@ -149,17 +149,7 @@ class TabularMDP:
         rewards = [total_reward - reward_par[0], reward_par[0]]
         idx = np.random.binomial(1, reward_par[1], 1)[0]
         return rewards[idx]
-        """
-        if self.reward_dist[state]:
-            if self.reward_dist[state][conf][action].any():
-                reward_par = self.reward_dist[state][conf][action]
-                rewards = [total_reward - reward_par[0], reward_par[0]]
-                idx = np.random.binomial(1, reward_par[1], 1)[0]
-                return rewards[idx]
-            return 0
-        return 0
-        """
-    
+
     def start(self):
         id_ = np.random.multinomial(1,self.start_prob,1).argmax()
         initial_state = self.start_states[id_]
@@ -180,7 +170,7 @@ class TabularMDP:
             next_state = np.clip(state_ + np.array(m), a_min = self.min_state, a_max = self.max_state)
             next_state = tuple(next_state)
             #will also need to return the mediator later
-            return reward, next_state
+            return m, reward, next_state
         
         else:
             return self.start()
@@ -202,7 +192,7 @@ class TabularMDP:
             
             next_state = tuple(next_state)
             #will also need to return the mediator later
-            return reward, next_state
+            return m, reward, next_state
         
         else:
             return self.start()
@@ -349,29 +339,48 @@ class TabularMDP:
                       pd.DataFrame(0, index = self.SAS_count.index, columns = self.SAS_count.columns)]
         
         
+        def default_val1():
+            return pd.DataFrame(0, index = self.SA_count.index, columns = ["count"])
+        def default_val2():
+            return pd.DataFrame(0, index = self.SAS_count.index, columns = self.SAS_count.columns)
+        # NEW COUNTS needed for frontdoor criterion
+        # SAM_count
+        SAM_count  = defaultdict(default_val1)
+        # SAMS_count
+        SAMS_count = defaultdict(default_val2)
+        # SAM_reward - sum of rewards with state s,  action a, mediator m
+        SAM_reward = defaultdict(default_val1)
+        
         for k in range(K):
             episode = []
             s = self.start()
             for h in range(self.H):
                 u = np.random.binomial(1, self.u_prob[s], 1)
                 a = self.default_policy(s, self.actions, h, u)
-                r, s_ = self.transition_conf(s, a, u)
+                m, r, s_ = self.transition_conf(s, a, u)
                 
                 S_count.loc[str(s)] += 1
                 SA_count.loc[str(s),str(a)] += 1
                 SAS_count[str(s_)].loc[str(s),str(a)] += 1
                 SA_reward.loc[str(s),str(a)] += r
+                
                 SU_count.loc[str(s), u] += 1
                 SUA_count[u[0]].loc[str(s), str(a)] += 1
                 SUA_reward[u[0]].loc[str(s), str(a)] += r
                 SUAS_count[u[0]][str(s_)].loc[str(s), str(a)] += 1
+                
+                SAM_count[m].loc[str(s), str(a)] += 1
+                SAMS_count[m][str(s_)].loc[str(s), str(a)] += 1
+                SAM_reward[m].loc[str(s), str(a)] += r
+                
                 episode.append((s,u,a,r,s_))
                 
                 s = s_
             episodes.append(episode)
         
         counts = {"SA": SA_count, "SAS": SAS_count, "SA_reward": SA_reward, "S": S_count, 
-                  "SU": SU_count, "SUA": SUA_count,"SUA_reward":SUA_reward, "SUAS": SUAS_count}
+                  "SU": SU_count, "SUA": SUA_count,"SUA_reward": SUA_reward, "SUAS": SUAS_count,
+                  "SAM": SAM_count, "SAMS": SAMS_count, "SAM_reward": SAM_reward}
         
         return pd.DataFrame(episodes, dtype = object), counts
     

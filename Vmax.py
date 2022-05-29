@@ -76,7 +76,7 @@ class Vmax:
             state = self.env.start()
             for h in range(self.H):
                 action = self.policy(state)
-                reward, next_state = self.env.transition(state, action)
+                m, reward, next_state = self.env.transition(state, action)
                 if self.SA_count["count"].loc[str(state), str(action)] < self.m:
                     self.Q_update(str(state), str(action), str(next_state), reward, k*self.H + h)
                 self.reward[k*self.H + h] = reward
@@ -101,22 +101,47 @@ class Vmax:
                 
             elif how == "controlled":
                 print("Integrating the observational data with controlled confounding")
-                P_us = (self.env.counts["SU"].divide(self.env.counts["S"]["count"].clip(lower = 1, upper = None), axis=0))
+                P_us = self.env.counts["SU"].divide(self.env.counts["S"]["count"].clip(lower = 1, upper = None), axis=0)
                 P_suas1 = self.env.counts["SUAS"][0].divide(self.env.counts["SUA"][0]["count"].clip(lower = 1, upper = None), axis = 0)
                 P_suas2 = self.env.counts["SUAS"][1].divide(self.env.counts["SUA"][1]["count"].clip(lower = 1, upper = None), axis = 0)
                 P_sas = P_suas1.multiply(P_us[0], axis = 0, level = 0) + P_suas2.multiply(P_us[1], axis = 0, level = 0)
                 
-                SA_count = self.env.counts["SA"]
-                SAS_count = P_sas.multiply(SA_count["count"].clip(lower = 0, upper = self.m), axis = 0, level = 0)
                 SUA_reward =  self.env.counts["SUA_reward"]
                 R_sua0 = SUA_reward[0]["total"].divide(self.env.counts["SUA"][0]["count"].clip(lower = 1, upper = None), axis = 0) 
                 R_sua1 = SUA_reward[1]["total"].divide(self.env.counts["SUA"][1]["count"].clip(lower = 1, upper = None), axis = 0)
                 R_sa = R_sua0.multiply(P_us[0], axis = 0, level = 0) + R_sua1.multiply(P_us[1], axis = 0, level = 0)
-                #SA_reward = R_sa.multiply(SA_count["count"].clip(lower = 0, upper = self.m), axis = 0, level = 0)
                 
+                SA_count = self.env.counts["SA"]
+                SAS_count = P_sas.multiply(SA_count["count"].clip(lower = 0, upper = self.m), axis = 0, level = 0)
                 self.SA_count["count"] += SAS_count.sum(axis = 1)
                 self.SAS_count += SAS_count
-                self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0, level = 0)
+                self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0)
+                self.R_sa["reward"] = R_sa
+            
+            elif how == "controlled_FD":
+                print("Integrating the Observational data with controlled confounding using frontdoor criterion")
+                S_count = self.env.counts["S"]
+                SA_count = self.env.counts["SA"]
+                SAM_count = self.env.counts["SAM"]
+                SAMS_count = self.env.counts["SAMS"]
+                SAM_reward = self.env.counts["SAM_reward"]
+                mediators = self.env.mediators
+                P_sa = SA_count.divide(S_count["count"], axis = 0, level = 0)
+                P_sas = pd.DataFrame(0, index = self.env.counts["SAS"].index , columns = self.env.counts["SAS"].columns)
+                R_sa = pd.Series(0, index = SA_count.index)
+                for m in mediators:
+                    P_sam = SAM_count[m].divide(SA_count["count"].clip(lower = 1, upper = None), axis = 0)
+                    P_sams = SAMS_count[m].divide(SAM_count[m]["count"].clip(lower = 1, upper = None), axis = 0)
+                    inner_control = P_sams.multiply(P_sa["count"], axis = 0).groupby(level = 0).sum()
+                    P_sas += inner_control.multiply(P_sam["count"], axis = 0, level = 0)
+                    R_sam = SAM_reward[m].divide(SAM_count[m]["count"].clip(lower = 1, upper = None), axis = 0)
+                    inner_control_Rs = R_sam.multiply(P_sa["count"], axis = 0).groupby(level = 0).sum()
+                    R_sa += inner_control_Rs.multiply(P_sam["count"], axis = 0, level =0)["count"]
+                
+                SAS_count = P_sas.multiply(SA_count["count"].clip(lower = 0, upper = self.m), axis = 0, level = 0)
+                self.SA_count["count"] += SAS_count.sum(axis = 1)
+                self.SAS_count += SAS_count
+                self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0)
                 self.R_sa["reward"] = R_sa
                 
             else:

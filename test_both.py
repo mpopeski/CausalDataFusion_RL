@@ -21,8 +21,9 @@ def main(config):
     #env.save_env(path_environment)
     
     env.observational_data(K_obs)
-    integration = ["ignore", "naive", "controlled"]
-    integration_index = ["ignore_Rmax", "ignore_Vmax", "naive_Rmax", "naive_Vmax", "controlled_Rmax", "controlled_Vmax"]
+    integration = ["ignore", "naive", "controlled", "controlled_FD"]
+    integration_index = ["ignore_Rmax", "ignore_Vmax", "naive_Rmax", "naive_Vmax",\
+                         "controlled_Rmax", "controlled_Vmax", "controlled_FD_Rmax", "controlled_FD_Vmax"]
     gamma = 0.9
     eta = 0.0001
     Rmax = 1
@@ -45,7 +46,8 @@ def main(config):
         results.to_csv(path_ + f"results{rep}.csv")
 
 if __name__ == "__main__":
-    path = "../experiments_v23/"
-    configs =[(5000, 5000, 1000, path), (10000, 5000, 1000, path)]
+    path = "../experiments_v24/"
+    configs =[(5000, 5000, 1000, path), (10000, 5000, 1000, path),
+              (20000, 5000, 1000, path)]
     with Pool(processes=None) as p:
         p.map(main, configs)
