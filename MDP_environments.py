@@ -78,7 +78,7 @@ class TabularMDP:
         act_to_med = {}
         if action_values:
             for action in self.actions:
-                prob = np.random.choice(default_prob, size = len(self.mediators), replace = True)
+                prob = np.random.choice(default_prob, size = len(self.mediators), replace = False)
                 prob = np.exp(prob) / np.exp(prob).sum()
                 act_to_med[action] = prob
         else:

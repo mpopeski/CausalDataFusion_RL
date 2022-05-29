@@ -15,7 +15,7 @@ def main(config):
     path = config[3]
     path_ = path + f"Both/{K_obs}_{K_int}_{m}/"
     os.makedirs(path_, exist_ok=True)
-    env = TabularMDP(5, 6, 80, n_reward_states = 12, default_prob = 6, policy = "v3_eng", simpson = True)
+    env = TabularMDP(5, 6, 80, n_reward_states = 12, default_prob = 10, policy = "v3_eng", simpson = True)
     
     #path_environment = path_ + "environment/"
     #env.save_env(path_environment)
@@ -46,7 +46,7 @@ def main(config):
         results.to_csv(path_ + f"results{rep}.csv")
 
 if __name__ == "__main__":
-    path = "../experiments_v25/"
+    path = "../experiments_v26/"
     configs =[(5000, 5000, 1000, path), (10000, 5000, 1000, path),
               (20000, 5000, 1000, path)]
     with Pool(processes=None) as p:
