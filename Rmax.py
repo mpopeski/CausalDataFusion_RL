@@ -112,14 +112,15 @@ class R_MAX:
                 P_suas2 = self.env.counts["SUAS"][1].divide(self.env.counts["SUA"][1]["count"].clip(lower = 1, upper = None), axis = 0)
                 P_sas = P_suas1.multiply(P_us[0], axis = 0, level = 0) + P_suas2.multiply(P_us[1], axis = 0, level = 0)
                 
-                SA_count = self.env.counts["SA"]
-                SAS_count = P_sas.multiply(SA_count["count"].clip(lower = 0, upper = self.m), axis = 0, level = 0)
+                
                 SUA_reward =  self.env.counts["SUA_reward"]
                 R_sua0 = SUA_reward[0]["total"].divide(self.env.counts["SUA"][0]["count"].clip(lower = 1, upper = None), axis = 0) 
                 R_sua1 = SUA_reward[1]["total"].divide(self.env.counts["SUA"][1]["count"].clip(lower = 1, upper = None), axis = 0)
                 R_sa = R_sua0.multiply(P_us[0], axis = 0, level = 0) + R_sua1.multiply(P_us[1], axis = 0, level = 0)
                 #SA_reward = R_sa.multiply(SA_count["count"].clip(lower = 0, upper = self.m), axis = 0, level = 0)
                 
+                SA_count = self.env.counts["SUA"][0]["count"].combine(self.env.counts["SUA"][1]["count"], min)
+                SAS_count = P_sas.multiply(SA_count.clip(lower = 0, upper = self.m), axis = 0, level = 0)
                 self.SA_count["count"] += SAS_count.sum(axis = 1)
                 self.SAS_count += SAS_count
                 self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0, level = 0)
