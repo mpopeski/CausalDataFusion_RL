@@ -36,8 +36,8 @@ class TabularMDP:
         
         self.reward_states = [self.states[i] for i in np.random.choice(len(self.states), replace=False, size = n_reward_states)]
         # change this from reward actions to reward mediators ??
-        self.reward_mediators = {self.reward_states[j]: [self.mediators[i] for i in np.random.choice(len(self.mediators),\
-                            replace=False, size = n_reward_actions)] for j in range(len(self.reward_states))}
+        self.reward_mediators = {reward_state: [self.mediators[i] for i in np.random.choice(len(self.mediators),\
+                            replace=False, size = n_reward_actions)] for reward_state in self.reward_states}
         
         # also need a transition probability from action to mediators
         # if no mediators it's 1 if action == mediator 0 otherwise
@@ -54,7 +54,7 @@ class TabularMDP:
             self.reward_dist = self.get_reward_distribution()
         
         self.start_states = [state for state in self.states if state not in self.reward_states] #if sum(state)<=(self.max_state-2)]
-        start_prob = np.random.choice(default_prob, replace = True, size = len(self.start_states))
+        start_prob = default_prob * np.random.rand(len(self.start_states)) / 2
         self.start_prob = np.exp(start_prob) / np.exp(start_prob).sum() 
         
         self.u_prob = {state : (0.8-0.2)*np.random.rand() + 0.2 for state in self.states}
@@ -78,7 +78,6 @@ class TabularMDP:
         act_to_med = {}
         if action_values:
             for action in self.actions:
-                #prob = np.random.choice(default_prob, size = len(self.mediators), replace = False)
                 prob = default_prob * np.random.rand(len(self.mediators))
                 prob = np.exp(prob) / np.exp(prob).sum()
                 act_to_med[action] = prob
@@ -249,9 +248,9 @@ class TabularMDP:
     def get_default_observational_policy(self, default_prob):
         
         total_reward = 1
-        initial_logits_u1 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)\
+        initial_logits_u1 = pd.DataFrame(np.array([default_prob * np.random.rand(len(self.actions))\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
-        initial_logits_u0 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)\
+        initial_logits_u0 = pd.DataFrame(np.array([default_prob * np.random.rand(len(self.actions))\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
         reward_dist = self.get_reward_distribution_actions(self.act_to_med, self.reward_dist)
         for state in self.reward_states:
@@ -283,9 +282,9 @@ class TabularMDP:
     
     def get_df_policy_v3(self, default_prob):
         
-        initial_logits_u1 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)\
+        initial_logits_u1 = pd.DataFrame(np.array([(default_prob-1) * np.random.rand(len(self.actions)) + 1\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
-        initial_logits_u0 = pd.DataFrame(np.array([np.random.choice(default_prob, replace = True, size = len(self.actions)).astype(float)\
+        initial_logits_u0 = pd.DataFrame(np.array([(default_prob-1) * np.random.rand(len(self.actions)) + 1\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
         
         reward_dist = self.get_reward_distribution_actions(self.act_to_med, self.reward_dist)
@@ -307,8 +306,8 @@ class TabularMDP:
             idx_action_u0 = self.actions.index(BWC_u0)
             idx_action_u1 = self.actions.index(BWC_u1)
             
-            initial_logits_u1.loc[str(state), idx_action_u1] = max_logit_u1 + np.log(4)
-            initial_logits_u0.loc[str(state), idx_action_u0] = max_logit_u0 + np.log(4)
+            initial_logits_u1.loc[str(state), idx_action_u1] = max_logit_u1 + np.log(2)
+            initial_logits_u0.loc[str(state), idx_action_u0] = max_logit_u0 + np.log(2)
 
         
         prob_u1 = (np.exp(initial_logits_u1).T / np.exp(initial_logits_u1).sum(axis = 1)).T

@@ -46,7 +46,7 @@ def main(config):
         results.to_csv(path_ + f"results{rep}.csv")
 
 if __name__ == "__main__":
-    path = "../experiments_v29/"
+    path = "../experiments_v30/"
     configs =[(10000, 5000, 1000, path), (50000, 5000, 1000, path),
               (100000, 5000, 1000, path)]
     with Pool(processes=None) as p:
