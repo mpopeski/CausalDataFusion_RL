@@ -8,21 +8,20 @@ from collections import defaultdict
 import os
 
 
-
 class TabularMDP:
     
-    def __init__(self, state_values, action_values, H, n_reward_states = 3,\
+    def __init__(self, state_values = 3, action_values = 0, H = 5, n_reward_states = 3,\
                  n_reward_actions = 2, default_prob = 6, policy = "random",\
-                 simpson = False):
+                 simpson = False, conf_values = 2):
         
         state_dim = 2
         #action_dim = 2
         
-        # get the tabular states
         self.H = H
+        # get the tabular states
         self.states = list(product(*[[i for i in range(state_values)] for _ in range(state_dim)]))
         
-        # get the actions and mediator values if needed
+        # get the actions and mediator values(if needed)
         moves = [(-1, 0), (0, -1), (1, 0), (0, 1)]
         if action_values:
             self.actions = list(range(1, action_values+1))
@@ -34,32 +33,32 @@ class TabularMDP:
         self.max_state = state_values - 1
         self.min_state = 0
         
+        # get random reward states 
         self.reward_states = [self.states[i] for i in np.random.choice(len(self.states), replace=False, size = n_reward_states)]
-        # change this from reward actions to reward mediators ??
+        # get reward mediators (it is the same as reward action when no mediators are used)
         self.reward_mediators = {reward_state: [self.mediators[i] for i in np.random.choice(len(self.mediators),\
                             replace=False, size = n_reward_actions)] for reward_state in self.reward_states}
         
-        # also need a transition probability from action to mediators
-        # if no mediators it's 1 if action == mediator 0 otherwise
+        # transition probability from action to mediators
+        # if no mediators the probability is 1 if action == mediator 0 otherwise
         self.act_to_med = self.get_action_to_med(action_values, default_prob)
         
-        # change the other functions so transition goes state -> action -> mediator -> next state/reward
-        # and make sure it doesn't affect the case when we don't use mediators
-        # then we can test the same environment with frontdoor and backdoor
-            
         # I have reward distribution over states, u and mediators
         if simpson:
             self.reward_dist = self.get_reward_distribution_simpson()
         else:
             self.reward_dist = self.get_reward_distribution()
         
-        self.start_states = [state for state in self.states if state not in self.reward_states] #if sum(state)<=(self.max_state-2)]
+        # get probabilities for starting position, it is 0 for reward states
+        self.start_states = [state for state in self.states if state not in self.reward_states]
         start_prob = default_prob * np.random.rand(len(self.start_states)) / 2
         self.start_prob = np.exp(start_prob) / np.exp(start_prob).sum() 
         
+        # binary confounder
+        self.observable_conf = list(range(conf_values))
         self.u_prob = {state : (0.8-0.2)*np.random.rand() + 0.2 for state in self.states}
         
-        # default policy (obervational) parameters
+        # behavioral policy (obervational) parameters
         if policy == "random":
             self.prob_u1, self.prob_u0 = self.get_default_observational_policy(default_prob)
         elif policy == "v3_eng":
@@ -67,14 +66,28 @@ class TabularMDP:
         else:
             raise ValueError("default policy config not specified: Choose random or v3_eng")
         
-        # counters
-        SA = pd.MultiIndex.from_product([pd.Series(self.states).apply(str), pd.Series(self.actions).apply(str)], 
-                                        names = ["s", "a"])
+        
+        # TODO: counters - move this to new function
+        self.S_index = pd.Series(self.states).apply(str)
+        self.SA_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.actions).apply(str)], 
+                                                   names = ["s", "a"])
+        self.SU_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.observable_conf).apply(str)],
+                                                   names = ["s", "u"])
+        self.SUA_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.observable_conf).apply(str), pd.Series(self.actions).apply(str)],
+                                                    names = ["s", "u", "a"])
+        self.SAM_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.actions).apply(str), pd.Series(self.mediators).apply(str)],
+                                                    names = ["s", "a", "m"])
+        
+        """
         self.SA_count = pd.DataFrame(0, index = SA, columns = ["count"])
         self.SAS_count = pd.DataFrame(0, index = SA, columns = pd.Series(self.states).apply(str))
         self.SA_reward = pd.DataFrame(0, index = SA, columns = ["total"])
-        
+        """
     def get_action_to_med(self, action_values, default_prob):
+        # Takes input discrete action space and maps the discrete actions to
+        # a mediator which is a move - {left, right, up, down}
+        # if action_values = 0, then actions = moves and we have no mediators
+        
         act_to_med = {}
         if action_values:
             for action in self.actions:
@@ -92,6 +105,7 @@ class TabularMDP:
         return act_to_med
     
     def get_reward_distribution(self):
+        # basic reward distribution for a binary confounder
         
         total_reward = 1
         reward_dist = defaultdict(dict)
@@ -114,6 +128,7 @@ class TabularMDP:
         return reward_dist
     
     def get_reward_distribution_simpson(self):
+        # reward distribution to induce the simpson paradox in RL
         
         reward_dist = defaultdict(dict)
         
@@ -139,6 +154,8 @@ class TabularMDP:
         return reward_dist
     
     def get_reward(self, state, m, conf):
+        # get the reward from the reward distribution
+        
         total_reward = 1
         if not self.reward_dist[state]:
             return 0
@@ -151,11 +168,14 @@ class TabularMDP:
         return rewards[idx]
 
     def start(self):
+        # get a starting state
+        
         id_ = np.random.multinomial(1,self.start_prob,1).argmax()
         initial_state = self.start_states[id_]
         return initial_state
     
     def transition(self, state = None, action = None):
+        # online transition function
         if state and action: 
             u = np.random.binomial(1, self.u_prob[state], 1)[0]
             m_id = np.random.multinomial(1, self.act_to_med[action], 1).argmax()
@@ -169,53 +189,36 @@ class TabularMDP:
                     state_[1] += 2*u-1
             next_state = np.clip(state_ + np.array(m), a_min = self.min_state, a_max = self.max_state)
             next_state = tuple(next_state)
-            #will also need to return the mediator later
+            
             return m, reward, next_state
         
         else:
             return self.start()
         
     def transition_conf(self, state = None, action = None, u = None):
+        # offline transition function
         if state and action:
             m_id = np.random.multinomial(1, self.act_to_med[action], 1).argmax()
-            #print(m_id)
             m = self.mediators[m_id]
-            reward = self.get_reward(state, m, u[0])    
+            reward = self.get_reward(state, m, u)    
             state_ = np.array(state)
             if np.random.rand() < 0.75:
                 if np.random.rand() < 0.5:
                     state_[0] += 2*u-1
                 else:
                     state_[1] += 2*u-1
-            #print(m)
+
             next_state = np.clip(state_ + np.array(m), a_min = self.min_state, a_max = self.max_state)
-            
             next_state = tuple(next_state)
-            #will also need to return the mediator later
+
             return m, reward, next_state
         
         else:
             return self.start()
     
-        
-    def sample_episode(self, policy, **kwargs):
-        episode = []
-        s = self.start()
-        self.SA_count[:] = 0
-        self.SAS_count[:] = 0
-        self.SA_reward[:] = 0
-        for h in range(self.H):
-            a = policy(s, self.actions, h, kwargs)
-            r, s_ = self.transition(s,a)
-            self.SA_count.loc[str(s),str(a)] += 1
-            self.SAS_count[str(s_)].loc[str(s),str(a)] += 1
-            self.SA_reward.loc[str(s),str(a)] += r
-            episode.append((s,a,r,s_))
-            s = s_
-        return episode, self.SA_count, self.SAS_count, self.SA_reward
-    
     def get_reward_distribution_actions(self, act_to_med, reward_dist_med):
-        # I would need this just to get observational policy
+        # Helper function to get observational policy
+        
         reward_dist = defaultdict(dict)
         
         def default_val():
@@ -243,9 +246,8 @@ class TabularMDP:
         
         return reward_dist
                 
-                
-    
     def get_default_observational_policy(self, default_prob):
+        # basic random observational policy
         
         total_reward = 1
         initial_logits_u1 = pd.DataFrame(np.array([default_prob * np.random.rand(len(self.actions))\
@@ -281,6 +283,7 @@ class TabularMDP:
         
     
     def get_df_policy_v3(self, default_prob):
+        # Engineered policy to induce the simpson paradox in RL
         
         initial_logits_u1 = pd.DataFrame(np.array([(default_prob-1) * np.random.rand(len(self.actions)) + 1\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
@@ -315,7 +318,8 @@ class TabularMDP:
         
         return pd.DataFrame(prob_u1, index = pd.Series(self.states).apply(str)), pd.DataFrame(prob_u0, index = pd.Series(self.states).apply(str))
     
-    def default_policy(self, state, actions, h, u=0):
+    def default_policy(self, state, actions, u=0):
+        # get an action from the behavioral policy
         if u:
             prob = self.prob_u1.loc[str(state), :]            
         else:
@@ -324,68 +328,29 @@ class TabularMDP:
         return actions[idx[0]]
     
     def get_obs_data(self, K):
-        episodes = []
-        SA_count = pd.DataFrame(0, index = self.SA_count.index, columns = self.SA_count.columns)
-        SAS_count = pd.DataFrame(0, index = self.SAS_count.index, columns = self.SAS_count.columns)
-        SA_reward = pd.DataFrame(0, index = self.SA_reward.index, columns = self.SA_reward.columns)
-        S_count = pd.DataFrame(0, index = pd.Series(self.states).apply(str), columns = ["count"])
+        # get the observational data collected by episodes
+        # the columns of the dataframe are current state, action, reward, next_state
+        # plus confounder or intermediate variable depending on the scenario
         
-        SU_count = pd.DataFrame(0, index = pd.Series(self.states).apply(str), columns = [0, 1])
-        SUA_count = [pd.DataFrame(0, index = self.SA_count.index, columns = ["count"]),
-                     pd.DataFrame(0, index = self.SA_count.index, columns = ["count"])]
-        SUA_reward = [pd.DataFrame(0, index = self.SA_count.index, columns = ["total"]),
-                     pd.DataFrame(0, index = self.SA_count.index, columns = ["total"])]
-        SUAS_count = [pd.DataFrame(0, index = self.SAS_count.index, columns = self.SAS_count.columns),
-                      pd.DataFrame(0, index = self.SAS_count.index, columns = self.SAS_count.columns)]
-        
-        
-        def default_val1():
-            return pd.DataFrame(0, index = self.SA_count.index, columns = ["count"])
-        def default_val2():
-            return pd.DataFrame(0, index = self.SAS_count.index, columns = self.SAS_count.columns)
-        # NEW COUNTS needed for frontdoor criterion
-        # SAM_count
-        SAM_count  = defaultdict(default_val1)
-        # SAMS_count
-        SAMS_count = defaultdict(default_val2)
-        # SAM_reward - sum of rewards with state s,  action a, mediator m
-        SAM_reward = defaultdict(default_val1)
-        
+        obs_data = pd.DataFrame(columns = ["s","u","a","m","r","s_"])
+        i = 0
         for k in range(K):
-            episode = []
             s = self.start()
             for h in range(self.H):
-                u = np.random.binomial(1, self.u_prob[s], 1)
-                a = self.default_policy(s, self.actions, h, u)
+                # the observational agent observes the confounder 
+                u = np.random.binomial(1, self.u_prob[s], 1)[0]
+                a = self.default_policy(s, self.actions, u)
                 m, r, s_ = self.transition_conf(s, a, u)
                 
-                S_count.loc[str(s)] += 1
-                SA_count.loc[str(s),str(a)] += 1
-                SAS_count[str(s_)].loc[str(s),str(a)] += 1
-                SA_reward.loc[str(s),str(a)] += r
-                
-                SU_count.loc[str(s), u] += 1
-                SUA_count[u[0]].loc[str(s), str(a)] += 1
-                SUA_reward[u[0]].loc[str(s), str(a)] += r
-                SUAS_count[u[0]][str(s_)].loc[str(s), str(a)] += 1
-                
-                SAM_count[m].loc[str(s), str(a)] += 1
-                SAMS_count[m][str(s_)].loc[str(s), str(a)] += 1
-                SAM_reward[m].loc[str(s), str(a)] += r
-                
-                episode.append((s,u,a,r,s_))
+                obs_data.loc[i,:] = [str(s), str(u), str(a), str(m), r, str(s_)]
+                i += 1
                 
                 s = s_
-            episodes.append(episode)
-        
-        counts = {"SA": SA_count, "SAS": SAS_count, "SA_reward": SA_reward, "S": S_count, 
-                  "SU": SU_count, "SUA": SUA_count,"SUA_reward": SUA_reward, "SUAS": SUAS_count,
-                  "SAM": SAM_count, "SAMS": SAMS_count, "SAM_reward": SAM_reward}
-        
-        return pd.DataFrame(episodes, dtype = object), counts
-    
+                
+        return obs_data
+   
     def observational_data(self, K):
-        self.data, self.counts = self.get_obs_data(K) 
+        self.data = self.get_obs_data(K) 
         
     def save_env(self, path):
         os.makedirs(path, exist_ok=True)
