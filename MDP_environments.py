@@ -54,9 +54,16 @@ class TabularMDP:
         start_prob = default_prob * np.random.rand(len(self.start_states)) / 2
         self.start_prob = np.exp(start_prob) / np.exp(start_prob).sum() 
         
-        # binary confounder
+
+        assert conf_values >= 2
+        
         self.observable_conf = list(range(conf_values))
-        self.u_prob = {state : (0.8-0.2)*np.random.rand() + 0.2 for state in self.states}
+        self.n_conf = conf_values
+        if conf_values == 2:
+            # binary confounder
+            self.u_prob = {state : (0.8-0.2)*np.random.rand() + 0.2 for state in self.states}
+        else:
+            self.get_confounder_dist(conf_values)
         
         # behavioral policy (obervational) parameters
         if policy == "random":
@@ -66,8 +73,7 @@ class TabularMDP:
         else:
             raise ValueError("default policy config not specified: Choose random or v3_eng")
         
-        
-        # TODO: counters - move this to new function
+
         self.S_index = pd.Series(self.states).apply(str)
         self.SA_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.actions).apply(str)], 
                                                    names = ["s", "a"])
@@ -77,12 +83,133 @@ class TabularMDP:
                                                     names = ["s", "u", "a"])
         self.SAM_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.actions).apply(str), pd.Series(self.mediators).apply(str)],
                                                     names = ["s", "a", "m"])
+
+    def start(self):
+        # get a starting state
+        id_ = np.random.multinomial(1,self.start_prob,1).argmax()
+        initial_state = self.start_states[id_]
+        return initial_state
+    
+    def get_confounder(self, state):
+        # get the confounder values both observable and unbservable used in transition and reward function
+        u = np.random.multinomial(1, self.u_prob[state],1).argmax()
+        par = self.w_par[state][u]
+        w1 = np.random.binomial(1,(2*par[0] + par[1])/3,1)[0]
+        w2 = np.random.binomial(1,(2*par[1] + par[0])/3,1)[0]
+        return u, w1, w2
+    
+    def get_reward(self, state, m, conf):
+        # get reward from the reward distribution
+        total_reward = 1
+        if not self.reward_dist[state]:
+            return 0
+        if not self.reward_dist[state][conf][m].any():
+            return 0
         
-        """
-        self.SA_count = pd.DataFrame(0, index = SA, columns = ["count"])
-        self.SAS_count = pd.DataFrame(0, index = SA, columns = pd.Series(self.states).apply(str))
-        self.SA_reward = pd.DataFrame(0, index = SA, columns = ["total"])
-        """
+        reward_par = self.reward_dist[state][conf][m]
+        rewards = [total_reward - reward_par[0], reward_par[0]]
+        idx = np.random.binomial(1, reward_par[1], 1)[0]
+        return rewards[idx]
+    
+    def transition(self, state = None, action = None):
+        # online transition function
+        if state and action:
+            if self.n_conf == 2:
+                u = np.random.binomial(1, self.u_prob[state], 1)[0]
+                w1 = u
+                w2 = u
+            else:
+                u, w1, w2 = self.get_confounder(state)
+                
+            m_id = np.random.multinomial(1, self.act_to_med[action], 1).argmax()
+            m = self.mediators[m_id]
+            
+            reward = self.get_reward(state, m, w2)
+            
+            state_ = np.array(state)
+            if np.random.rand() < 0.75:
+                if np.random.rand() < 0.5:
+                    state_[0] += 2*w2-1
+                else:
+                    state_[1] += 2*w2-1
+                    
+            next_state = np.clip(state_ + np.array(m), a_min = self.min_state, a_max = self.max_state)
+            next_state = tuple(next_state)
+            return m, reward, next_state
+        
+        else:
+            return self.start()
+        
+    def transition_conf(self, state = None, action = None, u = None):
+        # offline transition function
+        if state and action:
+            m_id = np.random.multinomial(1, self.act_to_med[action], 1).argmax()
+            m = self.mediators[m_id]
+            
+            reward = self.get_reward(state, m, u)
+            
+            state_ = np.array(state)
+            if np.random.rand() < 0.75:
+                if np.random.rand() < 0.5:
+                    state_[0] += 2*u-1
+                else:
+                    state_[1] += 2*u-1
+
+            next_state = np.clip(state_ + np.array(m), a_min = self.min_state, a_max = self.max_state)
+            next_state = tuple(next_state)
+            return m, reward, next_state
+        
+        else:
+            return self.start()
+        
+    def default_policy(self, state, actions, u=0):
+        # get an action from the behavioral policy
+        if u:
+            prob = self.prob_u1.loc[str(state), :]            
+        else:
+            prob = self.prob_u0.loc[str(state), :]
+        idx = np.random.choice(len(actions), size = 1, p = prob)
+        return actions[idx[0]]
+    
+    def get_obs_data(self, K):
+        # get the observational data collected by episodes
+        # the columns of the dataframe are current state, action, reward, next_state
+        # plus confounder or intermediate variable depending on the scenario
+        
+        obs_data = pd.DataFrame(columns = ["s","u","a","m","r","s_"])
+        i = 0
+        for k in range(K):
+            s = self.start()
+            for h in range(self.H):
+                # the observational agent observes the confounder
+                
+                if self.n_conf == 2:
+                    u = np.random.binomial(1, self.u_prob[s], 1)[0]
+                    w1 = u
+                    w2 = u
+                else:
+                    u, w1, w2 = self.get_confounder(s)
+                    
+                a = self.default_policy(s, self.actions, w1)
+                m, r, s_ = self.transition_conf(s, a, w2)
+                
+                obs_data.loc[i,:] = [str(s), str(u), str(a), str(m), r, str(s_)]
+                i += 1
+                
+                s = s_
+                
+        return obs_data
+   
+    def observational_data(self, K):
+        self.data = self.get_obs_data(K)
+    
+    #HELFPER FUNCs: used to define all parts of the environment
+    
+    def get_confounder_dist(self, obs_k):
+        # Used to define structure of the confounding
+        self.u_prob = {state:self.get_multinomial_prob(obs_k) for state in self.states}
+        self.w_par = {state:self.bin_probs(obs_k) for state in self.states}
+        
     def get_action_to_med(self, action_values, default_prob):
         # Takes input discrete action space and maps the discrete actions to
         # a mediator which is a move - {left, right, up, down}
@@ -105,7 +232,7 @@ class TabularMDP:
         return act_to_med
     
     def get_reward_distribution(self):
-        # basic reward distribution for a binary confounder
+        # Option #1: basic reward distribution for a binary confounder
         
         total_reward = 1
         reward_dist = defaultdict(dict)
@@ -124,11 +251,10 @@ class TabularMDP:
                 dist[1][mediator] = np.array([conf_rewards[1], conf_prob[1]])
             
             reward_dist[state] = dist
-        
         return reward_dist
     
     def get_reward_distribution_simpson(self):
-        # reward distribution to induce the simpson paradox in RL
+        # Option #2: reward distribution to induce the simpson paradox in RL
         
         reward_dist = defaultdict(dict)
         
@@ -150,140 +276,23 @@ class TabularMDP:
                 dist[1][mediators_.iloc[i]] = np.array([rewards_upper[i], 1])
                 
             reward_dist[state] = dist
-        
         return reward_dist
-    
-    def get_reward(self, state, m, conf):
-        # get the reward from the reward distribution
-        
-        total_reward = 1
-        if not self.reward_dist[state]:
-            return 0
-        if not self.reward_dist[state][conf][m].any():
-            return 0
-        
-        reward_par = self.reward_dist[state][conf][m]
-        rewards = [total_reward - reward_par[0], reward_par[0]]
-        idx = np.random.binomial(1, reward_par[1], 1)[0]
-        return rewards[idx]
-
-    def start(self):
-        # get a starting state
-        
-        id_ = np.random.multinomial(1,self.start_prob,1).argmax()
-        initial_state = self.start_states[id_]
-        return initial_state
-    
-    def transition(self, state = None, action = None):
-        # online transition function
-        if state and action: 
-            u = np.random.binomial(1, self.u_prob[state], 1)[0]
-            m_id = np.random.multinomial(1, self.act_to_med[action], 1).argmax()
-            m = self.mediators[m_id]
-            reward = self.get_reward(state, m, u)
-            state_ = np.array(state)
-            if np.random.rand() < 0.75:
-                if np.random.rand() < 0.5:
-                    state_[0] += 2*u-1
-                else:
-                    state_[1] += 2*u-1
-            next_state = np.clip(state_ + np.array(m), a_min = self.min_state, a_max = self.max_state)
-            next_state = tuple(next_state)
-            
-            return m, reward, next_state
-        
-        else:
-            return self.start()
-        
-    def transition_conf(self, state = None, action = None, u = None):
-        # offline transition function
-        if state and action:
-            m_id = np.random.multinomial(1, self.act_to_med[action], 1).argmax()
-            m = self.mediators[m_id]
-            reward = self.get_reward(state, m, u)    
-            state_ = np.array(state)
-            if np.random.rand() < 0.75:
-                if np.random.rand() < 0.5:
-                    state_[0] += 2*u-1
-                else:
-                    state_[1] += 2*u-1
-
-            next_state = np.clip(state_ + np.array(m), a_min = self.min_state, a_max = self.max_state)
-            next_state = tuple(next_state)
-
-            return m, reward, next_state
-        
-        else:
-            return self.start()
-    
-    def get_reward_distribution_actions(self, act_to_med, reward_dist_med):
-        # Helper function to get observational policy
-        
-        reward_dist = defaultdict(dict)
-        
-        def default_val():
-            return np.array([])
-        
-        for state in self.reward_states:
-            dist = {}
-            dist[0] = defaultdict(default_val)
-            dist[1] = defaultdict(default_val)
-            rewards0 = reward_dist_med[state][0]
-            rewards1 = reward_dist_med[state][1]
-            for action in self.actions:
-                r0 = 0
-                r1 = 0
-                for med in rewards0.keys():
-                    r0 += (rewards0[med][0]*rewards0[med][1] + (1-rewards0[med][0])*(1-rewards0[med][1]))*\
-                        act_to_med[action][self.mediators.index(med)]
-                    r1 += (rewards1[med][0]*rewards1[med][1] + (1-rewards1[med][0])*(1-rewards1[med][1]))*\
-                        act_to_med[action][self.mediators.index(med)]
-                if r0 > 0 or r1 > 0:
-                    dist[0][action] = np.array([r0, 1])
-                    dist[1][action] = np.array([r1, 1])
-            
-            reward_dist[state] = dist
-        
-        return reward_dist
-                
+               
     def get_default_observational_policy(self, default_prob):
-        # basic random observational policy
-        
-        total_reward = 1
-        initial_logits_u1 = pd.DataFrame(np.array([default_prob * np.random.rand(len(self.actions))\
-                                                   for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
-        initial_logits_u0 = pd.DataFrame(np.array([default_prob * np.random.rand(len(self.actions))\
-                                                   for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
-        reward_dist = self.get_reward_distribution_actions(self.act_to_med, self.reward_dist)
-        for state in self.reward_states:
-            
-            assert len(initial_logits_u1.loc[str(state)]) == len(self.actions)
-            
-            max_logit_u1 = initial_logits_u1.loc[str(state)].max()
-            max_logit_u0 = initial_logits_u0.loc[str(state)].max()
-            
-            # best worst case rewards in the reward states
-            u0_cont = {key: min(value[0], total_reward - value[0]) for key, value in reward_dist[state][0].items()}
-            u1_cont = {key: max(value[0], total_reward - value[0]) for key, value in reward_dist[state][1].items()}
-            
-            BWC_u0 = max(u0_cont, key = u0_cont.get)
-            BWC_u1 = max(u1_cont, key = u1_cont.get)
+        # Behavioureal policy #1: basic random observational policy
 
-            idx_action_u0 = self.actions.index(BWC_u0)
-            idx_action_u1 = self.actions.index(BWC_u1)
-            
-            initial_logits_u1.loc[str(state), idx_action_u1] = max_logit_u1 + np.log(2)
-            initial_logits_u0.loc[str(state), idx_action_u0] = max_logit_u0 + np.log(2)
-
-        
+        initial_logits_u1 = pd.DataFrame(np.array([1 * np.random.rand(len(self.actions))\
+                                                   for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
+        initial_logits_u0 = pd.DataFrame(np.array([1 * np.random.rand(len(self.actions))\
+                                                   for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
+ 
         prob_u1 = (np.exp(initial_logits_u1).T / np.exp(initial_logits_u1).sum(axis = 1)).T
         prob_u0 = (np.exp(initial_logits_u0).T / np.exp(initial_logits_u0).sum(axis = 1)).T
-        
         return pd.DataFrame(prob_u1, index = pd.Series(self.states).apply(str)), pd.DataFrame(prob_u0, index = pd.Series(self.states).apply(str))
         
     
     def get_df_policy_v3(self, default_prob):
-        # Engineered policy to induce the simpson paradox in RL
+        # Behavioural policy #2: Engineered policy to induce the simpson paradox in RL
         
         initial_logits_u1 = pd.DataFrame(np.array([(default_prob-1) * np.random.rand(len(self.actions)) + 1\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
@@ -315,43 +324,61 @@ class TabularMDP:
         
         prob_u1 = (np.exp(initial_logits_u1).T / np.exp(initial_logits_u1).sum(axis = 1)).T
         prob_u0 = (np.exp(initial_logits_u0).T / np.exp(initial_logits_u0).sum(axis = 1)).T
-        
         return pd.DataFrame(prob_u1, index = pd.Series(self.states).apply(str)), pd.DataFrame(prob_u0, index = pd.Series(self.states).apply(str))
     
-    def default_policy(self, state, actions, u=0):
-        # get an action from the behavioral policy
-        if u:
-            prob = self.prob_u1.loc[str(state), :]            
-        else:
-            prob = self.prob_u0.loc[str(state), :]
-        idx = np.random.choice(len(actions), size = 1, p = prob)
-        return actions[idx[0]]
+    # UTILITY FUNCs: used in the helper functions
     
-    def get_obs_data(self, K):
-        # get the observational data collected by episodes
-        # the columns of the dataframe are current state, action, reward, next_state
-        # plus confounder or intermediate variable depending on the scenario
+    def get_reward_distribution_actions(self, act_to_med, reward_dist_med):
+        # Utility function used in behavioural policy #2
         
-        obs_data = pd.DataFrame(columns = ["s","u","a","m","r","s_"])
-        i = 0
-        for k in range(K):
-            s = self.start()
-            for h in range(self.H):
-                # the observational agent observes the confounder 
-                u = np.random.binomial(1, self.u_prob[s], 1)[0]
-                a = self.default_policy(s, self.actions, u)
-                m, r, s_ = self.transition_conf(s, a, u)
-                
-                obs_data.loc[i,:] = [str(s), str(u), str(a), str(m), r, str(s_)]
-                i += 1
-                
-                s = s_
-                
-        return obs_data
-   
-    def observational_data(self, K):
-        self.data = self.get_obs_data(K) 
+        reward_dist = defaultdict(dict)
         
+        def default_val():
+            return np.array([])
+        
+        for state in self.reward_states:
+            dist = {}
+            dist[0] = defaultdict(default_val)
+            dist[1] = defaultdict(default_val)
+            rewards0 = reward_dist_med[state][0]
+            rewards1 = reward_dist_med[state][1]
+            for action in self.actions:
+                r0 = 0
+                r1 = 0
+                for med in rewards0.keys():
+                    r0 += (rewards0[med][0]*rewards0[med][1] + (1-rewards0[med][0])*(1-rewards0[med][1]))*\
+                        act_to_med[action][self.mediators.index(med)]
+                    r1 += (rewards1[med][0]*rewards1[med][1] + (1-rewards1[med][0])*(1-rewards1[med][1]))*\
+                        act_to_med[action][self.mediators.index(med)]
+                if r0 > 0 or r1 > 0:
+                    dist[0][action] = np.array([r0, 1])
+                    dist[1][action] = np.array([r1, 1])
+            
+            reward_dist[state] = dist
+        return reward_dist
+            
+    def get_multinomial_prob(self, obs_k):
+        # Utility function to get probabilities for multinomial distribution
+        # used in to define confounder distribution
+        
+        base = 1 / obs_k
+        add = 2*np.random.randint(low=0, high = 2, size = obs_k)-1
+        val = (1/(2*obs_k))*np.random.rand(obs_k)
+        prob_ = base + add*val
+        prob = prob_/prob_.sum()
+        
+        return prob
+    
+    def bin_probs(self, obs_k):
+        # get a parameter for binomial distributions for different parent values
+        # used in to define confounder distribution
+        par = []
+        for _ in range(obs_k):
+            par.append(((0.8-0.2)*np.random.rand() + 0.2, (0.8-0.2)*np.random.rand() + 0.2))
+        return par
+    
+    
+    #TODO: Update the save_env function and create new one load_env to guarantee reproducibility of results
     def save_env(self, path):
         os.makedirs(path, exist_ok=True)
         index = []
