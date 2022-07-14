@@ -176,8 +176,7 @@ class TabularMDP:
         # the columns of the dataframe are current state, action, reward, next_state
         # plus confounder or intermediate variable depending on the scenario
         
-        obs_data = pd.DataFrame(columns = ["s","u","a","m","r","s_"])
-        i = 0
+        data = []
         for k in range(K):
             s = self.start()
             for h in range(self.H):
@@ -193,12 +192,14 @@ class TabularMDP:
                 a = self.default_policy(s, self.actions, w1)
                 m, r, s_ = self.transition_conf(s, a, w2)
                 
-                obs_data.loc[i,:] = [str(s), str(u), str(a), str(m), r, str(s_)]
-                i += 1
-                
+                data.append((s,u,a,m,r,s_))
                 s = s_
-                
-        return obs_data
+            
+            if k % 500 == 0:
+                print(f"Episode {k}, Samples collected: {k*self.H}")
+        
+        data = pd.DataFrame(data, columns= ["s","u","a","m","r","s_"]).applymap(str)
+        return data
    
     def observational_data(self, K):
         self.data = self.get_obs_data(K)

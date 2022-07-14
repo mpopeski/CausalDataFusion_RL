@@ -4,6 +4,7 @@
 import pandas as pd
 import os
 from multiprocessing import Pool
+import copy
 
 from Rmax import R_MAX
 from Vmax import Vmax
@@ -11,14 +12,14 @@ from MDP_environments import TabularMDP
 
 K_obs = 5000
 # the environment
-env = TabularMDP(state_values = 5, action_values = 0, H = 800, n_reward_states=12, policy = "v3_eng", simpson = True)
+base_env = TabularMDP(state_values = 5, action_values = 0, H = 800, n_reward_states=12, policy = "v3_eng", simpson = True)
 print("collecting observational data")
-env.observational_data(K_obs)
+base_env.observational_data(K_obs)
     
 def main(config):
     path = config[0]
     size = config[1]
-    
+    env = copy.deepcopy(base_env)
     # number that I am gonna modify later
     m = 1000
     K_int = 500
@@ -59,7 +60,7 @@ def main2(path):
     eta = 0.0001
     Rmax = 1
     reps = 5
-    
+    env = copy.deepcopy(base_env)
     print("only online learning")
     for rep in range(reps):
         results = []
@@ -86,7 +87,7 @@ if __name__ == "__main__":
     for size in sizes:
         configs.append((path, size))
     
-    with Pool(processes=None) as p:
+    with Pool(processes=len(sizes)) as p:
         p.map(main, configs)
 
     main2(path)
