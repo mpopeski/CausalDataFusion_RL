@@ -118,6 +118,8 @@ class R_MAX:
         
         self.gen_init(N_sa, R_sa, P_sas)
         
+        print(how, " - percentage:", self.SA_count.sum() / (len(self.states)*len(self.actions)*self.m))
+        
     def save_model(self, path):
         os.makedirs(path, exist_ok=True)
         self.Q.to_csv(path + "Q.csv")

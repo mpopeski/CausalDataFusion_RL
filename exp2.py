@@ -53,7 +53,7 @@ def main(config):
     env.data["r"].to_csv(path_ + "obs_rew.csv")
 
 if __name__ == "__main__":
-    path = "../final_exp2/"
+    path = "../final_exp2_repeat/"
     
     configs = [(path, 4), (path, 8), (path, 16)]
 
