@@ -87,8 +87,10 @@ if __name__ == "__main__":
     for size in sizes:
         configs.append((path, size))
     
+    print("starting to learn different models")
+    
     with Pool(processes=len(sizes)) as p:
         p.map(main, configs)
 
     main2(path)
-    env.data["r"].to_csv(path + "obs_rew.csv")
+    base_env.data["r"].to_csv(path + "obs_rew.csv")
