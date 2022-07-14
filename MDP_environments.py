@@ -199,6 +199,7 @@ class TabularMDP:
                 print(f"Episode {k}, Samples collected: {k*self.H}")
         
         data = pd.DataFrame(data, columns= ["s","u","a","m","r","s_"]).applymap(str)
+        
         data.loc[:,"r"] = data.loc[:,"r"].apply(float)
         return data
    
