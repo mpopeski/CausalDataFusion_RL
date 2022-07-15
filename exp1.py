@@ -4,20 +4,18 @@
 import pandas as pd
 import os
 from multiprocessing import Pool
-import copy
 
 from Rmax import R_MAX
 from Vmax import Vmax
 from MDP_environments import TabularMDP
 
 env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
-path = "../final_exp1_mod2/"
+path = "../final_exp1/"
 
 def main(K_obs):
-
     data = env.get_obs_data(K_obs)    
-    m = 100
-    K_int = 50
+    m = 1000
+    K_int = 500
     
     integration = ["ignore", "naive", "controlled"]
     integration_index = ["ignore_Rmax", "ignore_Vmax", "naive_Rmax", "naive_Vmax","controlled_Rmax", "controlled_Vmax"]
@@ -46,13 +44,13 @@ def main(K_obs):
         results = pd.DataFrame(results, index = integration_index).T
         results.to_csv(path_ + f"results{rep}.csv")
     
-    env.data["r"].to_csv(path_ + "obs_rew.csv")
+    data["r"].to_csv(path_ + "obs_rew.csv")
 
 
 
 if __name__ == "__main__":
-    #sizes = [1000, 2000, 3000, 4000, 5000, 60000, 70000, 80000, 90000, 100000]
-    sizes = [100,200,300,400,500]
+    sizes = [1000, 2000, 3000, 4000, 5000]
+    #sizes = [100,200,300,400,500]
     print("starting to learn different models")
     with Pool(processes=None) as p:
         p.map(main, sizes)
