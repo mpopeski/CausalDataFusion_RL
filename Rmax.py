@@ -96,23 +96,20 @@ class R_MAX:
         if mask.sum() > 0:
             self.VI()
     
-    def initialize(self, how = 'ignore', size = None):
-        
-        if not size:
-            size = len(self.env.data)
-        
+    def initialize(self, data, how = 'ignore'):
+
         if how == "ignore":
             print("Ignoring the observational samples")
             return 0
         elif how == "naive":
             print("Naively integrating the observational data")
-            N_sa, R_sa, P_sas = naive_strategy(self.env.data.iloc[:size], self.env.S_index, self.env.SA_index)
+            N_sa, R_sa, P_sas = naive_strategy(data, self.env.S_index, self.env.SA_index)
         elif how == "controlled":
             print("Integrating the observational data with controlled confounding")
-            N_sa, R_sa, P_sas = backdoor_strategy(self.env.data.iloc[:size], self.env.S_index, self.env.SU_index, self.env.SUA_index)
+            N_sa, R_sa, P_sas = backdoor_strategy(data, self.env.S_index, self.env.SU_index, self.env.SUA_index)
         elif how == "controlled_FD":
             print("Integrating the observational data with controlled confounding using frontdoor criterion")
-            N_sa, R_sa, P_sas = frontdoor_strategy(self.env.data.iloc[:size], self.env.S_index, self.env.SA_index, self.env.SAM_index)
+            N_sa, R_sa, P_sas = frontdoor_strategy(data, self.env.S_index, self.env.SA_index, self.env.SAM_index)
         else:
             raise ValueError("Not a valid initialization method. Choose from: ignore, naive, controlled")
         

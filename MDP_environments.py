@@ -199,10 +199,7 @@ class TabularMDP:
         
         data.loc[:,"r"] = data.loc[:,"r"].apply(float)
         return data
-   
-    def observational_data(self, K):
-        self.data = self.get_obs_data(K)
-    
+       
     #HELFPER FUNCs: used to define all parts of the environment
     
     def get_confounder_dist(self, obs_k):

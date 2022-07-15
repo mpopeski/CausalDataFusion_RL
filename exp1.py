@@ -10,12 +10,12 @@ from Rmax import R_MAX
 from Vmax import Vmax
 from MDP_environments import TabularMDP
 
-    
+env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
+path = "../final_exp1_mod/"
+
 def main(config):
-    path = config[0]
     K_obs = config[1]
-    env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
-    env.observational_data(K_obs)
+    data = env.get_obs_data(K_obs)
     
     m = 100
     K_int = 50
@@ -35,12 +35,12 @@ def main(config):
         results = []
         for integ in integration:
             model1 = R_MAX(env, gamma, m, eta, Rmax, K_int)
-            model1.initialize(integ)
+            model1.initialize(data, integ)
             model1.learn()
             results.append(model1.reward)
             
             model2 = Vmax(env, gamma, m, eta, Rmax, K_int)
-            model2.initialize(integ)
+            model2.initialize(data, integ)
             model2.learn()
             results.append(model2.reward)
             
@@ -52,13 +52,10 @@ def main(config):
 
 
 if __name__ == "__main__":
-    path = "../final_exp1_mod/"
+    
     
     #sizes = [1000, 2000, 3000, 4000, 5000, 60000, 70000, 80000, 90000, 100000]
     sizes = [100,200,300,400,500]
-    configs = []
-    for size in sizes:
-        configs.append((path, size))
     print("starting to learn different models")
     with Pool(processes=None) as p:
-        p.map(main, configs)
+        p.map(main, sizes)
