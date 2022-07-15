@@ -11,12 +11,11 @@ from Vmax import Vmax
 from MDP_environments import TabularMDP
 
 env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
-path = "../final_exp1_mod/"
+path = "../final_exp1_mod2/"
 
-def main(config):
-    K_obs = config[1]
-    data = env.get_obs_data(K_obs)
-    
+def main(K_obs):
+
+    data = env.get_obs_data(K_obs)    
     m = 100
     K_int = 50
     
@@ -52,8 +51,6 @@ def main(config):
 
 
 if __name__ == "__main__":
-    
-    
     #sizes = [1000, 2000, 3000, 4000, 5000, 60000, 70000, 80000, 90000, 100000]
     sizes = [100,200,300,400,500]
     print("starting to learn different models")
