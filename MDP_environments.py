@@ -194,9 +194,6 @@ class TabularMDP:
                 
                 data.append((s,u,a,m,r,s_))
                 s = s_
-            
-            if k % 500 == 0:
-                print(f"Episode {k}, Samples collected: {k*self.H}")
         
         data = pd.DataFrame(data, columns= ["s","u","a","m","r","s_"]).applymap(str)
         
