@@ -10,17 +10,14 @@ from Rmax import R_MAX
 from Vmax import Vmax
 from MDP_environments import TabularMDP
 
-# the environment
-base_env = TabularMDP(state_values = 5, action_values = 2, H = 500, default_prob = 4, n_reward_states=12, policy = "random", 
-                     simpson = False, conf_values = 4)
 
-path = "../final_exp2_mod2/"
+path = "../final_exp2_mod3/"
 K_obs = 5000 
 
 def main(conf_val):
 
-    env = copy.deepcopy(base_env)
-    env.get_confounder_dist(conf_val)
+    env = TabularMDP(state_values = 5, action_values = 3, H = 500, default_prob = 4, n_reward_states=12, policy = "random", 
+                     simpson = False, conf_values = conf_val)
     
     print("collecting observational data")
     data = env.get_obs_data(K_obs)   
