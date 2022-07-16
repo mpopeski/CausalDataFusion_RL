@@ -11,10 +11,10 @@ from Vmax import Vmax
 from MDP_environments import TabularMDP
 
 # the environment
-base_env = TabularMDP(state_values = 5, action_values = 2, H = 500, default_prob = 3, n_reward_states=12, policy = "random", 
-                     simpson = True, conf_values = 4)
+base_env = TabularMDP(state_values = 5, action_values = 2, H = 500, default_prob = 4, n_reward_states=12, policy = "random", 
+                     simpson = False, conf_values = 4)
 
-path = "../final_exp2/"
+path = "../final_exp2_mod/"
 K_obs = 2500 
 
 def main(conf_val):
