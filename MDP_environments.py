@@ -278,9 +278,9 @@ class TabularMDP:
     def get_default_observational_policy(self, default_prob):
         # Behavioureal policy #1: basic random observational policy
 
-        initial_logits_u1 = pd.DataFrame(np.array([1 * np.random.rand(len(self.actions))\
+        initial_logits_u1 = pd.DataFrame(np.array([default_prob * np.random.rand(len(self.actions))\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
-        initial_logits_u0 = pd.DataFrame(np.array([1 * np.random.rand(len(self.actions))\
+        initial_logits_u0 = pd.DataFrame(np.array([default_prob * np.random.rand(len(self.actions))\
                                                    for _ in range(len(self.states))]), index = pd.Series(self.states).apply(str))
  
         prob_u1 = (np.exp(initial_logits_u1).T / np.exp(initial_logits_u1).sum(axis = 1)).T
