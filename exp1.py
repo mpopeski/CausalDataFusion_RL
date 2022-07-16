@@ -15,11 +15,11 @@ path = "../final_exp1/"
 def main(K_obs):
     data = env.get_obs_data(K_obs)    
     m = 1000
-    K_int = 500
+    K_int = 250
     
     integration = ["ignore", "naive", "controlled"]
-    integration_index = ["ignore_Rmax", "ignore_Vmax", "naive_Rmax", "naive_Vmax","controlled_Rmax", "controlled_Vmax"]
-    
+    #integration_index = ["ignore_Rmax", "ignore_Vmax", "naive_Rmax", "naive_Vmax","controlled_Rmax", "controlled_Vmax"]
+    integration_index = ["ignore_Rmax", "naive_Rmax", "controlled_Rmax"]
     gamma = 0.9
     eta = 0.0001
     Rmax = 1
@@ -35,12 +35,12 @@ def main(K_obs):
             model1.initialize(data, integ)
             model1.learn()
             results.append(model1.reward)
-            
+            """
             model2 = Vmax(env, gamma, m, eta, Rmax, K_int)
             model2.initialize(data, integ)
             model2.learn()
             results.append(model2.reward)
-            
+            """
         results = pd.DataFrame(results, index = integration_index).T
         results.to_csv(path_ + f"results{rep}.csv")
     
@@ -49,7 +49,7 @@ def main(K_obs):
 
 
 if __name__ == "__main__":
-    sizes = [1000, 2000, 3000, 4000, 5000]
+    sizes = [1000, 2500, 5000]
     #sizes = [100,200,300,400,500]
     print("starting to learn different models")
     with Pool(processes=None) as p:
