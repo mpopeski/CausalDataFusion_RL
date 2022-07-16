@@ -14,8 +14,8 @@ from MDP_environments import TabularMDP
 base_env = TabularMDP(state_values = 5, action_values = 2, H = 500, default_prob = 4, n_reward_states=12, policy = "random", 
                      simpson = False, conf_values = 4)
 
-path = "../final_exp2_mod/"
-K_obs = 2500 
+path = "../final_exp2_mod2/"
+K_obs = 5000 
 
 def main(conf_val):
 
