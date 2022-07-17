@@ -11,18 +11,18 @@ from Vmax import Vmax
 from MDP_environments import TabularMDP
 
 
-path = "../Final3/final_exp2/"
+path = "../Final4/final_exp2/"
 K_obs = 5000 
 
 def main(conf_val):
 
-    env = TabularMDP(state_values = 5, action_values = 3, H = 500, default_prob = 4, n_reward_states=12, policy = "random", 
+    env = TabularMDP(state_values = 5, action_values = 3, H = 500, default_prob = 5, n_reward_states=12, policy = "random", 
                      simpson = False, conf_values = conf_val)
     
     print("collecting observational data")
     data = env.get_obs_data(K_obs)   
     m = 1000
-    K_int = 400
+    K_int = 500
     
     integration = ["ignore", "controlled", "controlled_FD"]
     integration_index = ["ignore_Rmax", "ignore_Vmax", "controlled_Rmax",\

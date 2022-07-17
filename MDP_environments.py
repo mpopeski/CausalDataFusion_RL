@@ -261,8 +261,9 @@ class TabularMDP:
             dist = {}
             dist[0] = defaultdict(default_val)
             dist[1] = defaultdict(default_val)
-            rewards_lower = self.get_low_reward(len(mediators))
-            rewards_upper = 0.1*np.random.rand(len(mediators)) + 0.9
+            rewards_lower = 0.2*np.random.rand(len(mediators))
+            rewards_lower.sort()
+            rewards_upper = 0.2*np.random.rand(len(mediators)) + 0.9
             rewards_upper.sort()
             mediators_ = pd.Series(mediators).sample(frac=1.)
             
