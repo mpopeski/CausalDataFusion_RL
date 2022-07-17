@@ -242,10 +242,9 @@ class TabularMDP:
             dist[0] = defaultdict(default_val)
             dist[1] = defaultdict(default_val)
             for mediator in mediators:
-                conf_rewards = (total_reward / 2) * np.random.rand(2)
-                conf_prob = (conf_rewards.max() + 0.1)*np.random.rand(2)
-                dist[0][mediator] = np.array([conf_rewards[0], conf_prob[0]])
-                dist[1][mediator] = np.array([conf_rewards[1], conf_prob[1]])
+                conf_rewards = total_reward * np.random.rand(2)
+                dist[0][mediator] = np.array([conf_rewards[0], 1])
+                dist[1][mediator] = np.array([conf_rewards[1], 1])
             
             reward_dist[state] = dist
         return reward_dist
@@ -262,9 +261,8 @@ class TabularMDP:
             dist = {}
             dist[0] = defaultdict(default_val)
             dist[1] = defaultdict(default_val)
-            rewards_lower = 0.5*np.random.rand(len(mediators))
-            rewards_lower.sort()
-            rewards_upper = 0.2*np.random.rand(len(mediators)) + 0.8
+            rewards_lower = self.get_low_reward(len(mediators))
+            rewards_upper = 0.1*np.random.rand(len(mediators)) + 0.9
             rewards_upper.sort()
             mediators_ = pd.Series(mediators).sample(frac=1.)
             
@@ -374,6 +372,14 @@ class TabularMDP:
             par.append(((0.8-0.2)*np.random.rand() + 0.2, (0.8-0.2)*np.random.rand() + 0.2))
         return par
     
+    def get_low_reward(self, k):
+        # define the low reward setting when using the simpson reward distribution
+        offset = 0.6 / k
+        step = 0.6 / (2*k) 
+        rewards = []
+        for i in range(k):
+            rewards.append(step*np.random.rand() + i*offset)
+        return np.array(rewards)
     
     #TODO: Update the save_env function and create new one load_env to guarantee reproducibility of results
     def save_env(self, path):
