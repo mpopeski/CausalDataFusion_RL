@@ -10,7 +10,8 @@ from Vmax import Vmax
 from MDP_environments import TabularMDP
 
 env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
-path = "../Final4/final_exp1/"
+path = "../Final5/final_exp1/"
+env.save_env(path + "Environment/")
 
 def main(K_obs):
     data = env.get_obs_data(K_obs)    

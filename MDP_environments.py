@@ -6,84 +6,37 @@ import pandas as pd
 from itertools import product
 from collections import defaultdict
 import os
-
+import copy
 
 class TabularMDP:
     
     def __init__(self, state_values = 3, action_values = 0, H = 5, n_reward_states = 3,\
                  n_reward_actions = 2, default_prob = 6, policy = "random",\
                  simpson = False, conf_values = 2):
-        
-        state_dim = 2
-        #action_dim = 2
-        
+
         self.H = H
-        # get the tabular states
-        self.states = list(product(*[[i for i in range(state_values)] for _ in range(state_dim)]))
         
-        # get the actions and mediator values(if needed)
-        moves = [(-1, 0), (0, -1), (1, 0), (0, 1)]
-        if action_values:
-            self.actions = list(range(1, action_values+1))
-            self.mediators = moves
-        else:
-            self.actions = moves
-            self.mediators = moves
-    
-        self.max_state = state_values - 1
-        self.min_state = 0
+        # set the tabular state space
+        self.state_space(state_values)
         
-        # get random reward states 
-        self.reward_states = [self.states[i] for i in np.random.choice(len(self.states), replace=False, size = n_reward_states)]
-        # get reward mediators (it is the same as reward action when no mediators are used)
-        self.reward_mediators = {reward_state: [self.mediators[i] for i in np.random.choice(len(self.mediators),\
-                            replace=False, size = n_reward_actions)] for reward_state in self.reward_states}
+        # set the action space or action + intermediate variable space 
+        self.action_space(action_values, default_prob)
         
-        # transition probability from action to mediators
-        # if no mediators the probability is 1 if action == mediator 0 otherwise
-        self.act_to_med = self.get_action_to_med(action_values, default_prob)
+        # set the reward function
+        self.reward_function(n_reward_states, n_reward_actions, simpson)
         
-        # I have reward distribution over states, u and mediators
-        if simpson:
-            self.reward_dist = self.get_reward_distribution_simpson()
-        else:
-            self.reward_dist = self.get_reward_distribution()
+        # set the starting probabilities
+        self.starting_states(default_prob)
         
-        # get probabilities for starting position, it is 0 for reward states
-        self.start_states = [state for state in self.states if state not in self.reward_states]
-        start_prob = default_prob * np.random.rand(len(self.start_states)) / 2
-        self.start_prob = np.exp(start_prob) / np.exp(start_prob).sum() 
+        # set the confounder distribution
+        self.confounder_distribution(conf_values)
         
-
-        assert conf_values >= 2
+        # set the default observational policy
+        self.obs_policy(default_prob, policy)
         
-        self.observable_conf = list(range(conf_values))
-        self.n_conf = conf_values
-        if conf_values == 2:
-            # binary confounder
-            self.u_prob = {state : (0.8-0.2)*np.random.rand() + 0.2 for state in self.states}
-        else:
-            self.get_confounder_dist(conf_values)
+        # pandas indexex useful for storing data
+        self.set_indices()
         
-        # behavioral policy (obervational) parameters
-        if policy == "random":
-            self.prob_u1, self.prob_u0 = self.get_default_observational_policy(default_prob)
-        elif policy == "v3_eng":
-            self.prob_u1, self.prob_u0 = self.get_df_policy_v3(default_prob)
-        else:
-            raise ValueError("default policy config not specified: Choose random or v3_eng")
-        
-
-        self.S_index = pd.Series(self.states).apply(str)
-        self.SA_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.actions).apply(str)], 
-                                                   names = ["s", "a"])
-        self.SU_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.observable_conf).apply(str)],
-                                                   names = ["s", "u"])
-        self.SUA_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.observable_conf).apply(str), pd.Series(self.actions).apply(str)],
-                                                    names = ["s", "u", "a"])
-        self.SAM_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.actions).apply(str), pd.Series(self.mediators).apply(str)],
-                                                    names = ["s", "a", "m"])
-
     def start(self):
         # get a starting state
         id_ = np.random.multinomial(1,self.start_prob,1).argmax()
@@ -199,8 +152,90 @@ class TabularMDP:
         
         data.loc[:,"r"] = data.loc[:,"r"].apply(float)
         return data
-       
-    #HELFPER FUNCs: used to define all parts of the environment
+    
+    # ENVIRONMENT DEFINING FUNCTIONS
+    def state_space(self, state_values):
+        # get the tabular states
+        self.states = list(product(*[[i for i in range(state_values)] for _ in range(2)]))
+        self.max_state = state_values - 1
+        self.min_state = 0
+        
+    def action_space(self, action_values, default_prob):
+        # get the actions and mediator values(if needed)
+        moves = [(-1, 0), (0, -1), (1, 0), (0, 1)]
+        
+        if action_values:
+            self.actions = list(range(1, action_values+1))
+            self.mediators = moves
+        else:
+            self.actions = moves
+            self.mediators = moves
+            
+        # transition probability from action to mediators
+        # if no mediators the probability is 1 if action == mediator 0 otherwise
+        if default_prob:
+            self.act_to_med = self.get_action_to_med(action_values, default_prob)
+        
+        # needed for env saving and loading 
+        self.action_values = action_values
+        
+    def reward_function(self, n_reward_states, n_reward_actions, simpson):
+        # get random reward states 
+        self.reward_states = [self.states[i] for i in np.random.choice(len(self.states), replace=False, size = n_reward_states)]
+        # get reward mediators (it is the same as reward action when no mediators are used)
+        self.reward_mediators = {reward_state: [self.mediators[i] for i in np.random.choice(len(self.mediators),\
+                            replace=False, size = n_reward_actions)] for reward_state in self.reward_states}
+        
+        # I have reward distribution over states, u and mediators
+        if simpson:
+            self.reward_dist = self.get_reward_distribution_simpson()
+        else:
+            self.reward_dist = self.get_reward_distribution()
+    
+    def starting_states(self, default_prob):
+        # get probabilities for starting position, it is 0 for reward states
+        self.start_states = [state for state in self.states if state not in self.reward_states]
+        start_prob = default_prob * np.random.rand(len(self.start_states)) / 2
+        self.start_prob = np.exp(start_prob) / np.exp(start_prob).sum() 
+        
+    def confounder_distribution(self, conf_values, loading = False):
+        # get the confounder distribution
+        assert conf_values >= 2
+        
+        self.observable_conf = list(range(conf_values))
+        self.n_conf = conf_values
+        
+        if loading:
+            return 0
+        
+        if conf_values == 2:
+            # binary confounder
+            self.u_prob = {state : (0.8-0.2)*np.random.rand() + 0.2 for state in self.states}
+        else:
+            self.get_confounder_dist(conf_values)
+            
+    def obs_policy(self, default_prob, policy):
+        # behavioral policy (obervational) parameters
+        if policy == "random":
+            self.prob_u1, self.prob_u0 = self.get_default_observational_policy(default_prob)
+        elif policy == "v3_eng":
+            self.prob_u1, self.prob_u0 = self.get_df_policy_v3(default_prob)
+        else:
+            raise ValueError("default policy config not specified: Choose random or v3_eng")
+            
+    def set_indices(self):
+        self.S_index = pd.Series(self.states).apply(str)
+        self.SA_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.actions).apply(str)], 
+                                                   names = ["s", "a"])
+        self.SU_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.observable_conf).apply(str)],
+                                                   names = ["s", "u"])
+        self.SUA_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.observable_conf).apply(str), pd.Series(self.actions).apply(str)],
+                                                    names = ["s", "u", "a"])
+        self.SAM_index = pd.MultiIndex.from_product([self.S_index, pd.Series(self.actions).apply(str), pd.Series(self.mediators).apply(str)],
+                                                    names = ["s", "a", "m"])
+        
+        
+    # HELFPER FUNCs: used to define all parts of the environment
     
     def get_confounder_dist(self, obs_k):
         # Used to define structure of the confounding
@@ -261,9 +296,9 @@ class TabularMDP:
             dist = {}
             dist[0] = defaultdict(default_val)
             dist[1] = defaultdict(default_val)
-            rewards_lower = 0.2*np.random.rand(len(mediators))
+            rewards_lower = 0.7*np.random.rand(len(mediators))
             rewards_lower.sort()
-            rewards_upper = 0.2*np.random.rand(len(mediators)) + 0.8
+            rewards_upper = 0.1*np.random.rand(len(mediators)) + 0.9
             rewards_upper.sort()
             mediators_ = pd.Series(mediators).sample(frac=1.)
             
@@ -382,33 +417,82 @@ class TabularMDP:
             rewards.append(step*np.random.rand() + i*offset)
         return np.array(rewards)
     
-    #TODO: Update the save_env function and create new one load_env to guarantee reproducibility of results
+    
     def save_env(self, path):
+        # save_env function to save instance of the MDP environment 
         os.makedirs(path, exist_ok=True)
-        index = []
-        reward0 = []
-        prob0 = []
-        reward1 = []
-        prob1 = []
-        for state, actions in self.reward_actions.items():
-            for action in actions:
-                index.append((str(state), str(action)))
-                reward0.append(self.reward_dist[state][0][action][0])
-                prob0.append(self.reward_dist[state][0][action][1])
-                reward1.append(self.reward_dist[state][1][action][0])
-                prob1.append(self.reward_dist[state][1][action][1])
         
-        index = pd.MultiIndex.from_tuples(index, names = ["s","a"])
-        reward_dist = pd.DataFrame(np.array([reward0, prob0, reward1, prob1]).T, index = index, columns = ["reward0", "prob0", "reward1", "prob1"])
-        reward_dist.to_csv(path + "reward_dist.csv")
-        pd.DataFrame(self.u_prob.values(), index = pd.Series(self.u_prob.keys()).apply(str), columns = ["prob of 1"]).to_csv(path + "confounder.csv")
-        prob_u0 = self.prob_u0.copy()
-        prob_u1 = self.prob_u1.copy()
-        prob_u0.columns = pd.Series(self.actions).apply(str)
-        prob_u1.columns = pd.Series(self.actions).apply(str)
-        policy_folder = path + "policy/"
-        os.makedirs(policy_folder, exist_ok=True)
-        prob_u0.to_csv(path + "policy/actions_u0.csv")
-        prob_u1.to_csv(path + "policy/actions_u1.csv")
-        pd.DataFrame(self.start_prob, index = pd.Series(self.start_states).apply(str), columns = ["start_prob"]).to_csv(path +"start_prob.csv")
+        if path[-1] != '/':
+            path = path + '/'
+        
+        basic_par = np.array([self.H, int(self.max_state + 1), self.action_values, self.n_conf])
+        np.save(path + "basic_par", basic_par)
+        np.save(path + "reward_states", np.array({"item": self.reward_states}))
+        np.save(path + "reward_mediators", np.array(self.reward_mediators))
+        np.save(path + "start_states", np.array({"item":self.start_states}))
+        np.save(path + "start_prob", self.start_prob)
+        np.save(path + "act_to_med", np.array(self.act_to_med))
+        
+        np.save(path +"u_prob", np.array(self.u_prob))
+        if self.n_conf > 2:
+            np.save(path + "w_par", np.array(self.w_par))
+    
+        self.prob_u0.to_pickle(path + "prob_u0.pkl")
+        self.prob_u1.to_pickle(path + "prob_u1.pkl")
+        self.save_reward_dicts(path)
+
+    
+    def load_env(self, path):
+        # Load an enviroment saved by the save_env function
+        # to guarantee reproducibility of results
+        
+        if path[-1] != '/':
+            path = path + '/'
+        
+        basic_par = np.load(path + "basic_par.npy")
+        self.H = basic_par[0]
+        self.state_space(basic_par[1])
+        self.action_space(basic_par[2], 0)
+        self.act_to_med = np.load(path + "act_to_med.npy", allow_pickle = True).item()
+        self.reward_states = np.load(path + "reward_states.npy", allow_pickle = True).item()["item"]
+        self.reward_mediators = np.load(path + "reward_mediators.npy", allow_pickle = True).item()
+        self.start_states = np.load(path + "start_states.npy", allow_pickle = True).item()["item"]
+        self.start_prob = np.load(path + "start_prob.npy")
+        
+        self.confounder_distribution(basic_par[3], True)
+        self.u_prob = np.load(path + "u_prob.npy", allow_pickle = True).item()
+        if self.n_conf > 2:
+            self.w_par = np.load(path + "w_par.npy", allow_pickle = True).item()
+            
+        self.prob_u0 = pd.read_pickle(path + "prob_u0.pkl")
+        self.prob_u1 = pd.read_pickle(path + "prob_u1.pkl")
+        self.reward_dist = self.load_reward_dicts(path)
+        self.set_indices()
+
+    # HELPER FUNCTIONS: to save and load the defaultdicts used for self.reward_dist
+    def save_reward_dicts(self, path):
+        top_dct = dict(copy.deepcopy(self.reward_dist))
+        for state, dist in top_dct.items():
+            dist[0] = dict(dist[0])
+            dist[1] = dict(dist[1])
+            top_dct[state] = dist
+        np.save(path + "reward_dist", np.array(top_dct))
+        
+    def load_reward_dicts(self, path):
+        dct = np.load(path + "reward_dist.npy", allow_pickle = True).item()
+        
+        def default_val():
+            return np.array([])
+        
+        for state, dist in dct.items():
+            dist0_ = defaultdict(default_val)
+            dist1_ = defaultdict(default_val)
+            dist0_.update(dist[0])
+            dist1_.update(dist[1])
+            dist[0] = dist0_
+            dist[1] = dist1_
+        
+        reward_dist = defaultdict(dict)
+        reward_dist.update(dct)
+        return reward_dist
         

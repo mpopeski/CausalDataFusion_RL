@@ -11,7 +11,7 @@ from Vmax import Vmax
 from MDP_environments import TabularMDP
 
 
-path = "../Final4/final_exp2/"
+path = "../Final5/final_exp2/"
 K_obs = 5000 
 
 def main(conf_val):
@@ -34,6 +34,7 @@ def main(conf_val):
     reps = 5
     
     path_ = path + f"{conf_val}/" 
+    env.save_env(path_ + "Environment/")
     os.makedirs(path_, exist_ok=True)
     
     for rep in range(reps):
