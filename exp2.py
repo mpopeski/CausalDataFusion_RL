@@ -10,7 +10,7 @@ from Vmax import Vmax
 from MDP_environments import TabularMDP
 
 
-path = "../Final10/final_exp2/"
+path = "../Final11/final_exp2/"
 K_obs = 5000 
 
 def main(conf_val):
