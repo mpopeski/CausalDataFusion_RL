@@ -7,10 +7,11 @@ from multiprocessing import Pool
 
 from Rmax import R_MAX
 from Vmax import Vmax
+from MoRmax import MoRmax
 from MDP_environments import TabularMDP
 
 
-path = "../Final11/final_exp2/"
+path = "../MoRmax_final/final_exp2/"
 K_obs = 5000 
 
 def main(conf_val):
@@ -29,19 +30,19 @@ def main(conf_val):
     K_int = 500
     
     integration = ["ignore", "controlled", "controlled_FD"]
-    integration_index = ["ignore_Rmax", "ignore_Vmax", "controlled_Rmax",\
-                         "controlled_Vmax", "controlled_FD_Rmax", "controlled_FD_Vmax"]
+    #integration_index = ["ignore_Rmax", "ignore_Vmax", "controlled_Rmax",\
+    #                     "controlled_Vmax", "controlled_FD_Rmax", "controlled_FD_Vmax"]
+    integration_index = ["ignore_MoRmax", "controlled_MoRmax", "controlled_FD_MoRmax"]
     
     gamma = 0.9
     eta = 0.0001
     Rmax = 1
     reps = 5
     
-    
-    
     for rep in range(reps):
         results = []
         for integ in integration:
+            """
             model1 = R_MAX(env, gamma, m, eta, Rmax, K_int)
             model1.initialize(data, integ)
             model1.learn()
@@ -51,6 +52,11 @@ def main(conf_val):
             model2.initialize(data, integ)
             model2.learn()
             results.append(model2.reward)
+            """
+            model3 = MoRmax(env, gamma, m, eta, Rmax, K_int)
+            model3.initialize(data, integ)
+            model3.learn()
+            results.append(model3.reward)
             
         results = pd.DataFrame(results, index = integration_index).T
         results.to_csv(path_ + f"results{rep}.csv")

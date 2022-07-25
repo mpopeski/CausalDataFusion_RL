@@ -7,11 +7,12 @@ from multiprocessing import Pool
 
 from Rmax import R_MAX
 from Vmax import Vmax
+from MoRmax import MoRmax
 from MDP_environments import TabularMDP
 
 env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
 load_path = "../Final8/final_exp1/Environment/"
-path = "../Final8_repeat/final_exp1/"
+path = "../MoRmax_final/final_exp1/"
 
 if load_path:
     env.load_env(load_path)
@@ -24,8 +25,8 @@ def main(K_obs):
     K_int = 300
     
     integration = ["ignore", "naive", "controlled"]
-    integration_index = ["ignore_Rmax", "ignore_Vmax", "naive_Rmax", "naive_Vmax","controlled_Rmax", "controlled_Vmax"]
-    #integration_index = ["ignore_Rmax", "naive_Rmax", "controlled_Rmax"]
+    #integration_index = ["ignore_Rmax", "ignore_Vmax", "naive_Rmax", "naive_Vmax","controlled_Rmax", "controlled_Vmax"]
+    integration_index = ["ignore_MoRmax", "naive_MoRmax", "controlled_MoRmax"]
     gamma = 0.9
     eta = 0.0001
     Rmax = 1
@@ -37,6 +38,7 @@ def main(K_obs):
     for rep in range(reps):
         results = []
         for integ in integration:
+            """
             model1 = R_MAX(env, gamma, m, eta, Rmax, K_int)
             model1.initialize(data, integ)
             model1.learn()
@@ -46,6 +48,12 @@ def main(K_obs):
             model2.initialize(data, integ)
             model2.learn()
             results.append(model2.reward)
+            """
+            
+            model3 = MoRmax(env, gamma, m, eta, Rmax, K_int)
+            model3.initialize(data, integ)
+            model3.learn()
+            results.append(model3.reward)
             
         results = pd.DataFrame(results, index = integration_index).T
         results.to_csv(path_ + f"results{rep}.csv")
@@ -56,7 +64,7 @@ def main(K_obs):
 
 if __name__ == "__main__":
     sizes = [500, 1000, 2500, 5000]
-    #sizes = [100,200,300,400,500]
+    #sizes = [100,200,300]
     print("starting to learn different models")
     with Pool(processes=None) as p:
         p.map(main, sizes)

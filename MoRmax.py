@@ -8,7 +8,7 @@ import os
 
 from strategies import naive_strategy, backdoor_strategy, frontdoor_strategy
 
-class R_MAX:
+class MoRmax:
     
     def __init__(self, env, gamma, m, eta, Rmax, K):
         self.Rmax = Rmax
@@ -18,7 +18,12 @@ class R_MAX:
         self.eta = eta
         self.gamma = gamma
         self.m = m
+        self.eta2 = ((1-gamma)*eta)/15
+        self.t = 0
+        self.tao = 0
+        
         self.env = env
+        
         
         self.states = pd.Series(env.states).apply(str)
         self.actions = pd.Series(env.actions).apply(str)
@@ -27,13 +32,16 @@ class R_MAX:
         
         self.SA = pd.MultiIndex.from_product([self.states, self.actions], names = ["s", "a"])
         self.SAS = pd.MultiIndex.from_product([self.states, self.actions, self.states], names = ["s", "a", "s'"])
+        
+        self.update_time = pd.Series(0, index = self.SA)
                     
         self.SA_count = pd.DataFrame(0, index = self.SA, columns = ["count"])
         self.SAS_count = pd.DataFrame(0, index = self.SA, columns = self.states)
         self.SA_reward = pd.DataFrame(0, index = self.SA, columns = ["total"])
         self.R_sa = pd.DataFrame(self.Rmax, index = self.SA, columns = ["reward"])
-        self.Q = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
         self.P_sas = pd.DataFrame(0, index = self.SA, columns = self.states)
+        self.Q = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
+        
         
         for state in self.states:
             self.P_sas[state].loc[state, :] = 1
@@ -46,25 +54,45 @@ class R_MAX:
         self.SA_count.loc[state, action] += 1
         self.SAS_count[next_state].loc[state, action] += 1
         self.SA_reward.loc[state, action] += reward
+        self.t += 1
         
     def Q_update(self, state, action, next_state, reward, k):
         self.update_counts(state, action, next_state, reward, k)
         if self.SA_count["count"].loc[state, action] >= self.m:
-            self.R_sa["reward"].loc[state, action] = self.SA_reward["total"].loc[state, action] / self.m
-            self.P_sas.loc[state, action] = self.SAS_count.loc[state, action].divide(self.SA_count["count"].loc[state, action], axis = 0)
-            self.VI()
+            #TODO: need change here
+            # this all happens inside another if condition
+            if (self.update_time.loc[state, action] == 0) or (self.tao > self.update_time.loc[state, action]):
+                P_sas = self.P_sas.copy()
+                R_sa = self.R_sa.copy()
+                R_sa["reward"].loc[state, action] = self.SA_reward["total"].loc[state, action] / self.m
+                P_sas.loc[state, action] = self.SAS_count.loc[state, action].divide(self.SA_count["count"].loc[state, action], axis = 0)
+                Q_ = self.VI(P_sas, R_sa)
+                if Q_.loc[state, action] + self.eta2 < self.Q["value"].loc[state, action]:
+                    self.P_sas = P_sas
+                    self.R_sa = R_sa
+                    self.Q["value"] = Q_
+            
+                self.update_time.loc[state, action] = self.t
+                self.tao = self.t
+            
+            #this is outside the if condition
+            self.SA_count["count"].loc[state, action] = 0
+            self.SAS_count.loc[state, action] = 0
+            self.SA_reward["total"].loc[state, action] = 0
+            
         
-    def VI(self):
+    def VI(self, P_sas, R_sa):
         delta = 0
         first = 1
+        Q = self.Q.copy()["value"]
         while first or (delta > self.eta):
-            q = self.Q.copy()["value"]
-            delayed_value = self.gamma * self.P_sas.multiply(self.Q.groupby(level = 0).max()["value"]).sum(axis = 1)
-            imediate_reward = self.R_sa["reward"]
+            q = Q.copy()
+            delayed_value = self.gamma * P_sas.multiply(Q.groupby(level = 0).max()).sum(axis = 1)
+            imediate_reward = R_sa["reward"]
             Q = imediate_reward + delayed_value
-            self.Q["value"] = Q
             delta = (q - Q).abs().max()
-            first = 0            
+            first = 0
+        return Q
     
     def policy(self, state):
         Qs = self.Q["value"].loc[str(state), :]
@@ -77,8 +105,8 @@ class R_MAX:
             for h in range(self.H):
                 action = self.policy(state)
                 m, reward, next_state = self.env.transition(state, action)
-                if self.SA_count["count"].loc[str(state), str(action)] < self.m:
-                    self.Q_update(str(state), str(action), str(next_state), reward, k*self.H + h)
+                # always do the update
+                self.Q_update(str(state), str(action), str(next_state), reward, k*self.H + h)
                 self.reward[k*self.H + h] = reward
                 state = next_state
     
@@ -89,11 +117,21 @@ class R_MAX:
         self.SAS_count += P_sas.multiply(self.SA_count["count"], axis = 0)
         
         mask = self.SA_count["count"] >= self.m
-        self.R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask] / self.m
-        self.P_sas.loc[mask] = self.SAS_count.loc[mask] / self.m
         if mask.sum() > 0:
-            self.VI()
-    
+            R_sa = self.R_sa.copy()
+            P_sas = self.P_sas.copy()
+            R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask] / self.m
+            P_sas.loc[mask] = self.SAS_count.loc[mask] / self.m
+            Q_ = self.VI(P_sas, R_sa)
+            if np.any(Q_ + self.eta2 < self.Q["value"]):
+                self.P_sas = P_sas
+                self.R_sa = R_sa
+                self.Q["value"] = Q_
+            
+            self.SA_count["count"].loc[mask] = 0
+            self.SAS_count.loc[mask] = 0
+            self.SA_reward["total"].loc[mask] = 0
+                     
     def initialize(self, data, how = 'ignore'):
 
         if how == "ignore":
