@@ -41,6 +41,7 @@ class MoRmax:
         self.R_sa = pd.DataFrame(self.Rmax, index = self.SA, columns = ["reward"])
         self.P_sas = pd.DataFrame(0, index = self.SA, columns = self.states)
         self.Q = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
+        self.Q_prev = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
         
         
         for state in self.states:
@@ -60,20 +61,23 @@ class MoRmax:
         self.update_counts(state, action, next_state, reward, k)
         if self.SA_count["count"].loc[state, action] >= self.m:
             #TODO: need change here
-            # this all happens inside another if condition
-            if (self.update_time.loc[state, action] == 0) or (self.tao > self.update_time.loc[state, action]):
+            cond1 = self.update_time.loc[state, action] == 0
+            cond2 = (self.tao > self.update_time.loc[state, action])  and\
+                (self.Q_prev["value"].loc[state,action] - self.Q["value"].loc[state,action] > self.eta2)
+            if cond1 or cond2:
                 P_sas = self.P_sas.copy()
                 R_sa = self.R_sa.copy()
                 R_sa["reward"].loc[state, action] = self.SA_reward["total"].loc[state, action] / self.m
                 P_sas.loc[state, action] = self.SAS_count.loc[state, action].divide(self.SA_count["count"].loc[state, action], axis = 0)
                 Q_ = self.VI(P_sas, R_sa)
-                if Q_.loc[state, action] + self.eta2 < self.Q["value"].loc[state, action]:
+                if Q_.loc[state, action] <= self.Q["value"].loc[state, action]:
                     self.P_sas = P_sas
                     self.R_sa = R_sa
                     self.Q["value"] = Q_
             
                 self.update_time.loc[state, action] = self.t
                 self.tao = self.t
+                self.Q_prev["value"].loc[state, action] = self.Q["value"].loc[state, action]
             
             #this is outside the if condition
             self.SA_count["count"].loc[state, action] = 0
@@ -123,11 +127,12 @@ class MoRmax:
             R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask] / self.m
             P_sas.loc[mask] = self.SAS_count.loc[mask] / self.m
             Q_ = self.VI(P_sas, R_sa)
-            if np.any(Q_ + self.eta2 < self.Q["value"]):
+            if np.any(Q_ < self.Q["value"]):
                 self.P_sas = P_sas
                 self.R_sa = R_sa
                 self.Q["value"] = Q_
             
+            self.Q_prev["value"].loc[mask] = self.Q["value"].loc[mask]
             self.SA_count["count"].loc[mask] = 0
             self.SAS_count.loc[mask] = 0
             self.SA_reward["total"].loc[mask] = 0
