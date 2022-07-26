@@ -11,18 +11,23 @@ from MoRmax import MoRmax
 from MDP_environments import TabularMDP
 
 
-path = "../MoRmax_final/final_exp2/"
+path = "../MoRmax_final2/final_exp2/"
+load_path = "../Final10/final_exp2/"
 K_obs = 5000 
 
 def main(conf_val):
     path_ = path + f"{conf_val}/" 
+    load_path_ = load_path + f"{conf_val}/Environment/"
     
     os.makedirs(path_, exist_ok=True)
 
     env = TabularMDP(state_values = 5, action_values = 3, H = 500, default_prob = 4, n_reward_states=12, policy = "random", 
                      simpson = False, conf_values = conf_val)
     
-    env.save_env(path_ + "Environment/")
+    if load_path_:
+        env.load_env(load_path_)
+    else:
+        env.save_env(path_ + "Environment/")
     
     print("collecting observational data")
     data = env.get_obs_data(K_obs)   

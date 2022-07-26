@@ -12,7 +12,7 @@ from MDP_environments import TabularMDP
 
 env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
 load_path = "../Final8/final_exp1/Environment/"
-path = "../MoRmax_final/final_exp1/"
+path = "../MoRmax_final2/final_exp1/"
 
 if load_path:
     env.load_env(load_path)

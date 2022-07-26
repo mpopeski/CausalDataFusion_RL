@@ -60,10 +60,10 @@ class MoRmax:
     def Q_update(self, state, action, next_state, reward, k):
         self.update_counts(state, action, next_state, reward, k)
         if self.SA_count["count"].loc[state, action] >= self.m:
-            #TODO: need change here
             cond1 = self.update_time.loc[state, action] == 0
             cond2 = (self.tao > self.update_time.loc[state, action])  and\
                 (self.Q_prev["value"].loc[state,action] - self.Q["value"].loc[state,action] > self.eta2)
+                
             if cond1 or cond2:
                 P_sas = self.P_sas.copy()
                 R_sa = self.R_sa.copy()
@@ -127,7 +127,7 @@ class MoRmax:
             R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask] / self.m
             P_sas.loc[mask] = self.SAS_count.loc[mask] / self.m
             Q_ = self.VI(P_sas, R_sa)
-            if np.any(Q_ <= self.Q["value"]):
+            if np.any(Q_.loc[mask] <= self.Q["value"]).loc[mask]:
                 self.P_sas = P_sas
                 self.R_sa = R_sa
                 self.Q["value"] = Q_
