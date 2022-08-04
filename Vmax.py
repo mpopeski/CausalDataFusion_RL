@@ -11,6 +11,8 @@ from strategies import naive_strategy, backdoor_strategy, frontdoor_strategy
 class Vmax:
     
     def __init__(self, env, gamma, m, eta, Rmax, K):
+        
+        # General Vmax parameters
         self.Rmax = Rmax
         self.Vmax = Rmax / (1-gamma)
         self.H = env.H
@@ -18,26 +20,50 @@ class Vmax:
         self.eta = eta
         self.gamma = gamma
         self.m = m
+        
+        # the environment 
         self.env = env
         
-        self.states = pd.Series(env.states).apply(str)
+        # seting indices 
+        self.states = env.S_index
         self.actions = pd.Series(env.actions).apply(str)
+        self.SA = env.SA_index
+        
+        # set and action space cardinality
         self.S = len(self.states)
         self.A = len(self.actions)
         
-        self.SA = pd.MultiIndex.from_product([self.states, self.actions], names = ["s", "a"])
-        self.SAS = pd.MultiIndex.from_product([self.states, self.actions, self.states], names = ["s", "a", "s'"])
-                    
+        # Initializing Vmax            
         self.SA_count = pd.DataFrame(0, index = self.SA, columns = ["count"])
         self.SAS_count = pd.DataFrame(0, index = self.SA, columns = self.states)
         self.SA_reward = pd.DataFrame(0, index = self.SA, columns = ["total"])
         self.R_sa = pd.DataFrame(0, index = self.SA, columns = ["reward"])
-        
-        self.data = pd.DataFrame(index = range(K), columns = range(self.H), dtype = object)
-        
         self.Q = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
-        
+    
+        # Initializing history counters for the whole data and only the reward
+        self.data = pd.DataFrame(index = range(K), columns = range(self.H), dtype = object)
         self.reward = pd.Series(0, index = range(K*self.H), dtype = float)
+    
+    # Vmax learning loop with the modified Value iteration
+    def learn(self):
+        for k in range(self.K):
+            state = self.env.start()
+            for h in range(self.H):
+                action = self.policy(state)
+                m, reward, next_state = self.env.transition(state, action)
+                if self.SA_count["count"].loc[str(state), str(action)] < self.m:
+                    self.Q_update(str(state), str(action), str(next_state), reward, k*self.H + h)
+                self.reward[k*self.H + h] = reward
+                state = next_state
+                
+    def policy(self, state):
+        Qs = self.Q["value"].loc[str(state), :]
+        action = Qs.idxmax()
+        return literal_eval(action)
+    
+    def Q_update(self, state, action, next_state, reward, k):
+        self.update_counts(state, action, next_state, reward)
+        self.VI()
         
     def update_counts(self, state, action, next_state, reward):
         self.SA_count.loc[state, action] += 1
@@ -45,12 +71,8 @@ class Vmax:
         self.SA_reward.loc[state, action] += reward
         self.R_sa["reward"].loc[state, action] = self.SA_reward["total"].loc[state, action] / self.SA_count["count"].loc[state, action]
         
-        
-    def Q_update(self, state, action, next_state, reward, k):
-        self.update_counts(state, action, next_state, reward)
-        self.VI()
-        
     def VI(self):
+        # Modified Value Iteration from Vmax algorithm
         mask = self.SA_count["count"] > 0
         P_SAS = self.SAS_count.loc[mask].divide(self.SA_count["count"].loc[mask], axis = 0)
         delta = 0
@@ -66,34 +88,7 @@ class Vmax:
             delta = (q - Q_).abs().max()
             first = 0            
     
-    def policy(self, state):
-        Qs = self.Q["value"].loc[str(state), :]
-        action = Qs.idxmax()
-        return literal_eval(action)
-        
-    def learn(self):
-        for k in range(self.K):
-            state = self.env.start()
-            for h in range(self.H):
-                action = self.policy(state)
-                m, reward, next_state = self.env.transition(state, action)
-                if self.SA_count["count"].loc[str(state), str(action)] < self.m:
-                    self.Q_update(str(state), str(action), str(next_state), reward, k*self.H + h)
-                self.reward[k*self.H + h] = reward
-                state = next_state
-    
-    def gen_init(self, N_sa, R_sa, P_sas):
-        
-        self.SA_count["count"] += N_sa.clip(lower = 0, upper = self.m)
-        self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0)
-        self.SAS_count += P_sas.multiply(self.SA_count["count"], axis = 0)
-        
-        mask = self.SA_count["count"] > 0
-        self.R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask].divide(self.SA_count["count"].loc[mask], axis = 0)
-        
-        if mask.sum() > 0:
-            self.VI()
-    
+    # Initializaiton from observational data based on different strategies
     def initialize(self, data, how = 'ignore'):
             
         if how == "ignore":
@@ -112,8 +107,19 @@ class Vmax:
             raise ValueError("Not a valid initialization method. Choose from: ignore, naive, controlled")
         
         self.gen_init(N_sa, R_sa, P_sas)
+    
+    # Vmax initialization from observational estimates 
+    def gen_init(self, N_sa, R_sa, P_sas):
         
-        print(how, " - percentage:", self.SA_count.sum() / (len(self.states)*len(self.actions)*self.m))
+        self.SA_count["count"] += N_sa.clip(lower = 0, upper = self.m)
+        self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0)
+        self.SAS_count += P_sas.multiply(self.SA_count["count"], axis = 0)
+        
+        mask = self.SA_count["count"] > 0
+        self.R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask].divide(self.SA_count["count"].loc[mask], axis = 0)
+        
+        if mask.sum() > 0:
+            self.VI()
     
     def save_model(self, path):
         os.makedirs(path, exist_ok=True)

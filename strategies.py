@@ -4,8 +4,16 @@
 import numpy as np
 import pandas as pd
 
+# obs_data is pandas dataframe with columns ["s","u","a","m","r","s_"] - 
+# current state, observable confounder, action, intermediate variable, reward and the next state
+# the additional inputs to the strategies are indices created in the environment class
+# All the strategies return:
+#   - the equivalence number: N_sa
+#   - the online reward estimate: R_sa
+#   - the online transition probability: P_sas
+
 def naive_strategy(obs_data, S_index, SA_index):
-    
+    # The naive strategy
     N_sa = pd.Series(0, index = SA_index)
     N_sa.update(obs_data[["s","a","s_"]].groupby(["s","a"]).count()["s_"])
     

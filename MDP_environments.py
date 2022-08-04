@@ -149,7 +149,6 @@ class TabularMDP:
                 s = s_
         
         data = pd.DataFrame(data, columns= ["s","u","a","m","r","s_"]).applymap(str)
-        
         data.loc[:,"r"] = data.loc[:,"r"].apply(float)
         return data
     
@@ -408,16 +407,8 @@ class TabularMDP:
             par.append(((0.8-0.2)*np.random.rand() + 0.2, (0.8-0.2)*np.random.rand() + 0.2))
         return par
     
-    def get_low_reward(self, k):
-        # define the low reward setting when using the simpson reward distribution
-        offset = 0.6 / k
-        step = 0.6 / (2*k) 
-        rewards = []
-        for i in range(k):
-            rewards.append(step*np.random.rand() + i*offset)
-        return np.array(rewards)
     
-    
+    #SAVING AND LOADING - a particular instance of this environment
     def save_env(self, path):
         # save_env function to save instance of the MDP environment 
         os.makedirs(path, exist_ok=True)

@@ -11,6 +11,8 @@ from strategies import naive_strategy, backdoor_strategy, frontdoor_strategy
 class MoRmax:
     
     def __init__(self, env, gamma, m, eta, Rmax, K):
+        
+        # General MoRmax parameters
         self.Rmax = Rmax
         self.Vmax = Rmax / (1-gamma)
         self.H = env.H
@@ -22,19 +24,20 @@ class MoRmax:
         self.t = 0
         self.tao = 0
         
+        # the environment 
         self.env = env
         
-        
-        self.states = pd.Series(env.states).apply(str)
+        # seting indices 
+        self.states = env.S_index
         self.actions = pd.Series(env.actions).apply(str)
+        self.SA = env.SA_index
+        
+        # set and action space cardinality
         self.S = len(self.states)
         self.A = len(self.actions)
         
-        self.SA = pd.MultiIndex.from_product([self.states, self.actions], names = ["s", "a"])
-        self.SAS = pd.MultiIndex.from_product([self.states, self.actions, self.states], names = ["s", "a", "s'"])
-        
+        # Initializing MoRmax
         self.update_time = pd.Series(0, index = self.SA)
-                    
         self.SA_count = pd.DataFrame(0, index = self.SA, columns = ["count"])
         self.SAS_count = pd.DataFrame(0, index = self.SA, columns = self.states)
         self.SA_reward = pd.DataFrame(0, index = self.SA, columns = ["total"])
@@ -43,20 +46,30 @@ class MoRmax:
         self.Q = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
         self.Q_prev = pd.DataFrame(self.Vmax, index = self.SA, columns = ["value"], dtype = float)
         
-        
         for state in self.states:
             self.P_sas[state].loc[state, :] = 1
         
+        # Initializing history counters for the whole data and only the reward
         self.data = pd.DataFrame(index = range(K), columns = range(self.H), dtype = object)
-        
         self.reward = pd.Series(0, index = range(K*self.H), dtype = float)
-        
-    def update_counts(self, state, action, next_state, reward, k):
-        self.SA_count.loc[state, action] += 1
-        self.SAS_count[next_state].loc[state, action] += 1
-        self.SA_reward.loc[state, action] += reward
-        self.t += 1
-        
+    
+    # MoRmax learning loop with repeated data collection
+    def learn(self):
+        for k in range(self.K):
+            state = self.env.start()
+            for h in range(self.H):
+                action = self.policy(state)
+                m, reward, next_state = self.env.transition(state, action)
+                # always do the update
+                self.Q_update(str(state), str(action), str(next_state), reward, k*self.H + h)
+                self.reward[k*self.H + h] = reward
+                state = next_state
+                
+    def policy(self, state):
+        Qs = self.Q["value"].loc[str(state), :]
+        action = Qs.sample(frac = 1.).idxmax()
+        return literal_eval(action)
+                    
     def Q_update(self, state, action, next_state, reward, k):
         self.update_counts(state, action, next_state, reward, k)
         if self.SA_count["count"].loc[state, action] >= self.m:
@@ -78,13 +91,17 @@ class MoRmax:
                 self.update_time.loc[state, action] = self.t
                 self.tao = self.t
                 self.Q_prev["value"].loc[state, action] = self.Q["value"].loc[state, action]
-            
-            #this is outside the if condition
+                
             self.SA_count["count"].loc[state, action] = 0
             self.SAS_count.loc[state, action] = 0
             self.SA_reward["total"].loc[state, action] = 0
+    
+    def update_counts(self, state, action, next_state, reward, k):
+        self.SA_count.loc[state, action] += 1
+        self.SAS_count[next_state].loc[state, action] += 1
+        self.SA_reward.loc[state, action] += reward
+        self.t += 1
             
-        
     def VI(self, P_sas, R_sa):
         delta = 0
         first = 1
@@ -98,45 +115,7 @@ class MoRmax:
             first = 0
         return Q
     
-    def policy(self, state):
-        Qs = self.Q["value"].loc[str(state), :]
-        action = Qs.sample(frac = 1.).idxmax()
-        return literal_eval(action)
-        
-    def learn(self):
-        for k in range(self.K):
-            state = self.env.start()
-            for h in range(self.H):
-                action = self.policy(state)
-                m, reward, next_state = self.env.transition(state, action)
-                # always do the update
-                self.Q_update(str(state), str(action), str(next_state), reward, k*self.H + h)
-                self.reward[k*self.H + h] = reward
-                state = next_state
-    
-    def gen_init(self, N_sa, R_sa, P_sas):
-        
-        self.SA_count["count"] += N_sa.clip(lower = 0, upper = self.m)
-        self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0)
-        self.SAS_count += P_sas.multiply(self.SA_count["count"], axis = 0)
-        
-        mask = self.SA_count["count"] >= self.m
-        if mask.sum() > 0:
-            R_sa = self.R_sa.copy()
-            P_sas = self.P_sas.copy()
-            R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask] / self.m
-            P_sas.loc[mask] = self.SAS_count.loc[mask] / self.m
-            Q_ = self.VI(P_sas, R_sa)
-            if np.any(Q_<= self.Q["value"]):
-                self.P_sas = P_sas
-                self.R_sa = R_sa
-                self.Q["value"] = Q_
-            
-            self.Q_prev["value"].loc[mask] = self.Q["value"].loc[mask]
-            self.SA_count["count"].loc[mask] = 0
-            self.SAS_count.loc[mask] = 0
-            self.SA_reward["total"].loc[mask] = 0
-                     
+    # Initialization from observational data based on different strategies
     def initialize(self, data, how = 'ignore'):
 
         if how == "ignore":
@@ -155,8 +134,30 @@ class MoRmax:
             raise ValueError("Not a valid initialization method. Choose from: ignore, naive, controlled")
         
         self.gen_init(N_sa, R_sa, P_sas)
+    
+    # MoRmax initializaion from observational estimates
+    def gen_init(self, N_sa, R_sa, P_sas):
         
-        print(how, " - percentage:", self.SA_count.sum() / (len(self.states)*len(self.actions)*self.m))
+        self.SA_count["count"] += N_sa.clip(lower = 0, upper = self.m)
+        self.SA_reward["total"] += R_sa.multiply(self.SA_count["count"], axis = 0)
+        self.SAS_count += P_sas.multiply(self.SA_count["count"], axis = 0)
+        
+        mask = self.SA_count["count"] >= self.m
+        if mask.sum() > 0:
+            R_sa = self.R_sa.copy()
+            P_sas = self.P_sas.copy()
+            R_sa["reward"].loc[mask] = self.SA_reward["total"].loc[mask] / self.m
+            P_sas.loc[mask] = self.SAS_count.loc[mask] / self.m
+            Q_ = self.VI(P_sas, R_sa)
+            if np.any(Q_<= self.Q["value"]):
+                self.P_sas = P_sas
+                self.R_sa = R_sa
+                self.Q["value"] = Q_
+            
+            self.SA_count["count"].loc[mask] = 0
+            self.SAS_count.loc[mask] = 0
+            self.SA_reward["total"].loc[mask] = 0
+                     
         
     def save_model(self, path):
         os.makedirs(path, exist_ok=True)
