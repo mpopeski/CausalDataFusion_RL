@@ -52,7 +52,7 @@ def main(conf_val):
         result = pd.DataFrame(result, index = integration_index).T
         result.to_csv(path_Rmax + f"results{rep}.csv")
         results_Rmax.append(result)
-    AverageReward_plot(results_Rmax, path_Rmax_avgRew, window_size=15)
+    AverageReward_plot(results_Rmax, path_Rmax_avgRew, window_size = 15, ylim = (0,150))
     
     path_Vmax = path_ + "Vmax/"
     os.makedirs(path_Vmax + "Figures/", exist_ok=True)
@@ -68,7 +68,7 @@ def main(conf_val):
         result = pd.DataFrame(result, index = integration_index).T
         result.to_csv(path_Vmax + f"results{rep}.csv")
         results_Vmax.append(result)
-    AverageReward_plot(results_Vmax, path_Vmax_avgRew, window_size=15)
+    AverageReward_plot(results_Vmax, path_Vmax_avgRew, window_size = 15, ylim = (0, 150))
     
     path_MoRmax = path_ + "MoRmax/"
     os.makedirs(path_MoRmax + "Figures/", exist_ok=True)
@@ -84,7 +84,7 @@ def main(conf_val):
         result = pd.DataFrame(result, index = integration_index).T
         result.to_csv(path_MoRmax + f"results{rep}.csv")
         results_MoRmax.append(result)
-    AverageReward_plot(results_MoRmax, path_MoRmax_avgRew, window_size=15)
+    AverageReward_plot(results_MoRmax, path_MoRmax_avgRew, window_size = 15, ylim = (0, 150))
 
 
 if __name__ == "__main__":
