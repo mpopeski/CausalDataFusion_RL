@@ -89,7 +89,7 @@ def main(conf_val):
 
 if __name__ == "__main__":
 
-    path = "../Results_exp2/"
+    path = "../Clean_repeat/Results_exp2/"
     load_path = "./Environments_exp2/"
     K_obs = 5000 
     

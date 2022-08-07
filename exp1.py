@@ -89,7 +89,7 @@ if __name__ == "__main__":
     
     env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
     load_path = "./Environment_exp1/"
-    path = "../Results_exp1/"
+    path = "../Clean_repeat/Results_exp1/"
     
     if load_path:
         env.load_env(load_path)
