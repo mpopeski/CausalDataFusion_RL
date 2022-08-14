@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import pandas as pd
+import argparse
 import os
 from multiprocessing import Pool
+
+import yaml
+import pandas as pd
 
 from Rmax import R_MAX
 from Vmax import Vmax
@@ -23,7 +26,6 @@ def main(K_obs):
     gamma = 0.9
     eta = 0.0001
     Rmax = 1
-    reps = 5
     
     path_ = path + f"{K_obs}/" 
     cumulative_results = {}
@@ -87,9 +89,17 @@ def main(K_obs):
 
 if __name__ == "__main__":
     
+    parser = argparse.ArgumentParser(description="Training Params")
+    parser.add_argument('config', type = str, help='Path to a config file')
+    _args = parser.parse_args()
+    
+    with open(_args.config, 'r') as f:
+        cfg = yaml.safe_load(f)
+        
     env = TabularMDP(5, 0, 500, default_prob = 4, n_reward_states = 12, policy = "v3_eng", simpson = True)
-    load_path = "./Environment_exp1/"
-    path = "../Clean_repeat/Results_exp1/"
+    
+    load_path = cfg.get("load_path", "")
+    path = cfg.get("save_path", "./Results/exp1/")
     
     if load_path:
         env.load_env(load_path)
@@ -97,11 +107,11 @@ if __name__ == "__main__":
         env.save_env(path + "Environment/")
     
     # parameters for all alorithms
-    m = 1000
-    K_int = 300
-        
-    sizes = [500, 1000, 2500, 5000]
-
+    m = cfg.get("m", 100)
+    K_int = cfg.get("K_int", 30)
+    reps = cfg.get("reps", 3)
+    sizes = cfg.get("sizes", [50, 500])
+    
     print("starting to learn different models")
     with Pool(processes=None) as p:
         cumulative_results = p.map(main, sizes)

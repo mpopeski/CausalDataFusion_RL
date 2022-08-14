@@ -1,0 +1,6 @@
+load_path: ./Environment_exp1/
+save_path: ./Results/exp1/
+m: 100
+K_int: 30
+reps: 3
+sizes: [50, 500]

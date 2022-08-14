@@ -1,0 +1,7 @@
+load_path: ./Environments_exp2/
+save_path: ./Results/exp2/
+m: 100
+K_int: 50
+K_obs: 500
+reps: 3
+conf_vals: [16, 32]

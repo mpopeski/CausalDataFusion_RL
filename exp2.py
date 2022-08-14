@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import pandas as pd
+import argparse
 import os
 from multiprocessing import Pool
+
+import yaml
+import pandas as pd
 
 from Rmax import R_MAX
 from Vmax import Vmax
@@ -36,7 +39,6 @@ def main(conf_val):
     gamma = 0.9
     eta = 0.0001
     Rmax = 1
-    reps = 5
         
     path_Rmax = path_ + "Rmax/"
     os.makedirs(path_Rmax + "Figures/", exist_ok=True)
@@ -88,15 +90,23 @@ def main(conf_val):
 
 
 if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser(description="Training Params")
+    parser.add_argument('config', type = str, help='Path to a config file')
+    _args = parser.parse_args()
+    
+    with open(_args.config, 'r') as f:
+        cfg = yaml.safe_load(f)
 
-    path = "../Clean_repeat/Results_exp2/"
-    load_path = "./Environments_exp2/"
-    K_obs = 5000 
+    path = cfg.get("save_path", "./Results/exp2/")
+    load_path = cfg.get("load_path", "")
     
-    m = 1000
-    K_int = 500
+    m = cfg.get("m", 100)
+    K_obs = cfg.get("K_obs", 500)
+    K_int = cfg.get("K_int", 50)
+    reps = cfg.get("reps", 3)   
+    conf_vals = cfg.get("conf_vals", [16,32])
     
-    conf_vals = [4,8,16,32,64]
     with Pool(processes=None) as p:
         p.map(main, conf_vals)
         
