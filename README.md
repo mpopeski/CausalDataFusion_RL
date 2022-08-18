@@ -26,7 +26,7 @@ For experiment 2:
 
 `python exp2.py ./configs/exp2Config.yaml`
 
-These experiments take a while to run.
+These experiments take a while to run. When they finnish running a Results folder will appear with rewards history in csv files for different algorithms and methods, and plot images that summarize the results. 
 
 Faster less intensive variants can be run in 10-15min using the following commands:
 
