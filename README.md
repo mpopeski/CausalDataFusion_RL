@@ -31,4 +31,5 @@ These experiments take a while to run.
 Faster less intensive variants can be run in 10-15min using the following commands:
 
 `python exp1.py ./configs/exp1Config_fast.yaml`
+
 `python exp2.py ./configs/exp2Config_fast.yaml`
